@@ -6,6 +6,7 @@
 - [SGCP-1: acceso, criterios verificables y pruebas](SGCP-1-acceso-roles.md).
 - [SGCP-6, HU-01: registro de obligaciones en el backend](SGCP-6-HU-01-backend.md).
 - [SGCP-7, HU-02: consulta de obligaciones en el backend](SGCP-7-HU-02-backend.md).
+- [SGCP-8, HU-03: registro de pagos realizados en el backend](SGCP-8-HU-03-backend.md).
 - [Capturas de evidencia](evidence/README.md).
 - [Migraciones y preparación MySQL](../database/README.md).
 - [Instalación y comandos](../README.md).
