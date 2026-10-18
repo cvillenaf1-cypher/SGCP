@@ -1,0 +1,25 @@
+.navegacion-gerente { margin-top: 20px; }
+.pagos-del-mes .panel-heading { margin-top: 20px; }
+.filtros-pagos { display: flex; flex-wrap: wrap; gap: 12px 24px; }
+.filtros-pagos .field { flex: 1 1 180px; margin: 12px 0; }
+.filtros-pagos select {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #8b9cb2;
+  border-radius: 8px;
+  color: #1d2b40;
+  background: #fff;
+  font: inherit;
+}
+.filtros-pagos select:focus-visible,
+.contenedor-tabla-pagos:focus-visible { outline: 3px solid #b1c7ef; outline-offset: 1px; }
+.contenedor-tabla-pagos { max-width: 100%; overflow-x: auto; margin-top: 20px; }
+.tabla-pagos { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+.tabla-pagos caption { text-align: left; font-weight: 600; padding-bottom: 12px; }
+.tabla-pagos th, .tabla-pagos td { padding: 12px; border-bottom: 1px solid #dce5ef; vertical-align: top; }
+.tabla-pagos thead { background: #e8f0ff; color: #234b91; }
+.tabla-pagos tbody th, .tabla-pagos td:nth-child(2) { min-width: 140px; overflow-wrap: anywhere; }
+.tabla-pagos .monto-pago { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tabla-pagos .fecha-pago { white-space: nowrap; }
+.estado-pago { font-weight: 600; }
