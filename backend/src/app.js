@@ -5,6 +5,8 @@ import helmet from 'helmet'
 import { autenticar, autorizar } from './auth/middleware.js'
 import { crearServicioAutenticacion } from './auth/service.js'
 import { ROLES, validarInicioSesion } from './auth/validation.js'
+import { registrarObligacion } from './obligaciones/servicio.js'
+import { validarObligacion } from './obligaciones/validacion.js'
 
 export async function crearAplicacion({ pool: conexiones, config: configuracion }) {
   const aplicacion = express()
@@ -41,6 +43,13 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion 
   aplicacion.post('/api/auth/logout', requerirSesion, async (solicitud, respuesta) => {
     await conexiones.execute('UPDATE sesiones SET revocado_en = UTC_TIMESTAMP(3) WHERE id = ?', [solicitud.auth.sessionId])
     respuesta.sendStatus(204)
+  })
+
+  aplicacion.post('/api/obligaciones', requerirSesion, autorizar(ROLES.ASISTENTE), async (solicitud, respuesta) => {
+    const { fields: campos, ...entrada } = validarObligacion(solicitud.body)
+    if (Object.keys(campos).length) return respuesta.status(422).json({ message: 'Revisa los datos del formulario.', fields: campos })
+    const obligacion = await registrarObligacion(conexiones, entrada, solicitud.auth.user.id)
+    respuesta.status(201).json({ message: 'Obligación registrada correctamente.', obligacion })
   })
 
   // Paneles iniciales: permiten comprobar autorización real sin adelantar historias financieras.
