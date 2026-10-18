@@ -7,6 +7,7 @@
 - [SGCP-6, HU-01: registro de obligaciones en el backend](SGCP-6-HU-01-backend.md).
 - [SGCP-7, HU-02: consulta de obligaciones en el backend](SGCP-7-HU-02-backend.md).
 - [SGCP-8, HU-03: registro de pagos realizados en el backend](SGCP-8-HU-03-backend.md).
+- [SGCP-9, HU-04: comprobantes privados](SGCP-9-HU-04-comprobantes.md).
 - [Capturas de evidencia](evidence/README.md).
 - [Migraciones y preparación MySQL](../database/README.md).
 - [Instalación y comandos](../README.md).
@@ -41,3 +42,4 @@ históricos sin medio; SGCP-9 incorporará comprobantes y verificará sus criter
 Los asistentes comparten la información del único negocio, conservando quién registra cada operación.
 
 Esta preparación no crea recursos en AWS.
+

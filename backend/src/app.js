@@ -1,3 +1,4 @@
+import { registrarRutasComprobantes } from './comprobantes/rutas.js'
 import { validarRegistroAbono } from './abonos/validacion.js'
 import { registrarAbono, ErrorAbono } from './abonos/servicio.js'
 import cors from 'cors'
@@ -12,7 +13,7 @@ import { validarObligacion } from './obligaciones/validacion.js'
 import { listarObligaciones, obtenerObligacion } from './obligaciones/consulta.js'
 import { validarFiltroConsulta, validarIdentificadorObligacion } from './obligaciones/validacion-consulta.js'
 
-export async function crearAplicacion({ pool: conexiones, config: configuracion }) {
+export async function crearAplicacion({ pool: conexiones, config: configuracion, almacenComprobantes }) {
   const aplicacion = express()
   const servicio = await crearServicioAutenticacion(conexiones, configuracion.sessionMinutes)
   const requerirSesion = autenticar(conexiones)
@@ -83,6 +84,8 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion 
       throw error
     }
   })
+
+  registrarRutasComprobantes(aplicacion, conexiones, requerirSesion, almacenComprobantes)
 
   // Paneles iniciales: permiten comprobar autorización real sin adelantar historias financieras.
   aplicacion.get('/api/panel/asistente', requerirSesion, autorizar(ROLES.ASISTENTE), (_solicitud, respuesta) => {
