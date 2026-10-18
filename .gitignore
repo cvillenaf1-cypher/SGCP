@@ -1,0 +1,30 @@
+# Dependencias y compilaciones
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+
+# Variables locales (las plantillas sí se versionan)
+.env
+.env.*
+!.env.example
+
+# Registros y temporales
+*.log
+*.tmp
+*.swp
+*.tsbuildinfo
+.cache/
+npm-debug.log*
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Estado local de Amplify
+amplify/.config/local-*
+amplify/backend/amplify-meta.json
+amplify/#current-cloud-backend/
