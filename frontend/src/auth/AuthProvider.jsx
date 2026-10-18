@@ -1,52 +1,52 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiRequest } from '../lib/api'
-import { AuthContext } from './AuthContext'
+import { solicitarApi } from '../lib/api'
+import { ContextoAutenticacion } from './AuthContext'
 
-export function AuthProvider({ children }) {
+export function ProveedorAutenticacion({ children: contenido }) {
   // Intencionalmente sin localStorage, sessionStorage ni cookies.
-  const [state, setState] = useState({ session: null, notice: '' })
-  const token = state.session?.token
+  const [estado, establecerEstado] = useState({ sesion: null, aviso: '' })
+  const token = estado.sesion?.token
 
-  const clearSession = useCallback((expectedToken, notice = '') => {
-    setState((current) => current.session?.token === expectedToken ? { session: null, notice } : current)
+  const limpiarSesion = useCallback((tokenEsperado, aviso = '') => {
+    establecerEstado((actual) => actual.sesion?.token === tokenEsperado ? { sesion: null, aviso } : actual)
   }, [])
 
-  const signIn = useCallback(async (email, password) => {
-    const session = await apiRequest('/api/auth/login', { method: 'POST', body: { email, password } })
-    if (!session.token || !['ASISTENTE', 'GERENTE'].includes(session.user?.role) || !(Date.parse(session.expiresAt) > Date.now())) {
+  const iniciarSesion = useCallback(async (correo, contrasena) => {
+    const sesion = await solicitarApi('/api/auth/login', { method: 'POST', body: { email: correo, password: contrasena } })
+    if (!sesion.token || !['ASISTENTE', 'GERENTE'].includes(sesion.user?.role) || !(Date.parse(sesion.expiresAt) > Date.now())) {
       throw new Error('No se pudo validar la sesión del servidor.')
     }
-    setState({ session, notice: '' })
+    establecerEstado({ sesion, aviso: '' })
   }, [])
 
-  const request = useCallback(async (path, options = {}) => {
+  const solicitar = useCallback(async (ruta, opciones = {}) => {
     try {
-      return await apiRequest(path, { ...options, token })
+      return await solicitarApi(ruta, { ...opciones, token })
     } catch (error) {
-      if (error.status === 401) clearSession(token, 'Tu sesión venció o ya no está disponible. Inicia sesión nuevamente.')
+      if (error.status === 401) limpiarSesion(token, 'Tu sesión venció o ya no está disponible. Inicia sesión nuevamente.')
       throw error
     }
-  }, [token, clearSession])
+  }, [token, limpiarSesion])
 
-  const signOut = useCallback(async () => {
+  const cerrarSesion = useCallback(async () => {
     try {
-      await request('/api/auth/logout', { method: 'POST' })
+      await solicitar('/api/auth/logout', { method: 'POST' })
     } catch (error) {
       if (error.status !== 401) throw error
     }
-    clearSession(token)
-  }, [request, token, clearSession])
+    limpiarSesion(token)
+  }, [solicitar, token, limpiarSesion])
 
   useEffect(() => {
-    if (!state.session) return undefined
-    const expiresAt = Date.parse(state.session.expiresAt)
-    const expire = () => clearSession(token, 'Tu sesión venció. Inicia sesión nuevamente.')
-    const checkExpiry = () => { if (Date.now() >= expiresAt) expire() }
-    const timer = setTimeout(expire, Math.max(0, expiresAt - Date.now()))
-    window.addEventListener('focus', checkExpiry)
-    return () => { clearTimeout(timer); window.removeEventListener('focus', checkExpiry) }
-  }, [state.session, token, clearSession])
+    if (!estado.sesion) return undefined
+    const vencimiento = Date.parse(estado.sesion.expiresAt)
+    const vencerSesion = () => limpiarSesion(token, 'Tu sesión venció. Inicia sesión nuevamente.')
+    const comprobarVencimiento = () => { if (Date.now() >= vencimiento) vencerSesion() }
+    const temporizador = setTimeout(vencerSesion, Math.max(0, vencimiento - Date.now()))
+    window.addEventListener('focus', comprobarVencimiento)
+    return () => { clearTimeout(temporizador); window.removeEventListener('focus', comprobarVencimiento) }
+  }, [estado.sesion, token, limpiarSesion])
 
-  const value = useMemo(() => ({ user: state.session?.user || null, notice: state.notice, signIn, signOut, request }), [state, signIn, signOut, request])
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  const valor = useMemo(() => ({ usuario: estado.sesion?.user || null, aviso: estado.aviso, iniciarSesion, cerrarSesion, solicitar }), [estado, iniciarSesion, cerrarSesion, solicitar])
+  return <ContextoAutenticacion.Provider value={valor}>{contenido}</ContextoAutenticacion.Provider>
 }

@@ -41,7 +41,7 @@ conservan `/api/health`, la estructura inicial y `amplify.yml`.
 Login recibe exclusivamente `email` y `password`. Las peticiones protegidas llevan
 `Authorization: Bearer <token>`. Los paneles son puntos de entrada de acceso, no
 implementaciones anticipadas de los módulos económicos. Las próximas rutas deberán
-aplicar `authenticate(pool)` y `authorize(...)` según la historia.
+aplicar `autenticar(conexiones)` y `autorizar(...)` según la historia.
 
 ## Resultados de esta entrega
 

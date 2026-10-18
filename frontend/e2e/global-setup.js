@@ -1,18 +1,18 @@
-import { fixtureUser, openTestDatabase, removeFixture } from '../../backend/test/support/database.js'
+import { crearUsuarioPrueba, abrirBasePruebas, eliminarUsuarioPrueba } from '../../backend/test/support/database.js'
 
-export default async function setup() {
-  const { pool } = await openTestDatabase()
-  const users = []
+export default async function prepararPruebas() {
+  const { pool: conexiones } = await abrirBasePruebas()
+  const usuarios = []
   try {
-    users.push(await fixtureUser(pool, 'ASISTENTE'))
-    users.push(await fixtureUser(pool, 'GERENTE'))
+    usuarios.push(await crearUsuarioPrueba(conexiones, 'ASISTENTE'))
+    usuarios.push(await crearUsuarioPrueba(conexiones, 'GERENTE'))
     // Credenciales aleatorias solo en memoria del proceso, nunca en archivos ni capturas.
-    process.env.SGCP_E2E_USERS = JSON.stringify(users)
+    process.env.SGCP_E2E_USERS = JSON.stringify(usuarios)
     return async () => {
-      try { for (const user of users) await removeFixture(pool, user) } finally { await pool.end() }
+      try { for (const usuario of usuarios) await eliminarUsuarioPrueba(conexiones, usuario) } finally { await conexiones.end() }
     }
   } catch (error) {
-    try { for (const user of users) await removeFixture(pool, user) } finally { await pool.end() }
+    try { for (const usuario of usuarios) await eliminarUsuarioPrueba(conexiones, usuario) } finally { await conexiones.end() }
     throw error
   }
 }
