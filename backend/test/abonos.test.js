@@ -11,7 +11,7 @@ const entrada = { monto: '0.10', medio_pago: 'Efectivo', clave_idempotencia: 'op
 const configuracion = { frontendUrl: 'http://localhost:5173', sessionMinutes: 60, loginWindowMs: 60000, loginLimit: 100 }
 
 // Doble de consultas y ciclo transaccional; no simula bloqueos InnoDB.
-function prepararPool({ saldo = '0.30', existente = true, anterior, errorInsercion, rol = 'ASISTENTE' } = {}) {
+function prepararPool({ saldo = '0.30', existente = true, anterior, errorInsercion, errorActualizacion, rol = 'ASISTENTE' } = {}) {
   let abono = anterior
   const conexion = {
     beginTransaction: mock.fn(async () => {}),
@@ -27,7 +27,11 @@ function prepararPool({ saldo = '0.30', existente = true, anterior, errorInserci
         abono = { id: 8, obligacion_id: valores[0], monto: valores[1], medio_pago: valores[2], usuario_registrador_id: valores[3], saldo_resultante: valores[5], huella_solicitud: valores[6], fecha_registro: '2026-10-18 12:00:00.123' }
         return [{ insertId: 8 }]
       }
-      if (sql.includes('UPDATE obligaciones')) { saldo = valores[0]; return [{ affectedRows: 1 }] }
+      if (sql.includes('UPDATE obligaciones')) {
+        if (errorActualizacion) throw errorActualizacion
+        saldo = valores[0]
+        return [{ affectedRows: 1 }]
+      }
       throw new Error('Consulta inesperada en el doble.')
     }),
   }
@@ -100,11 +104,15 @@ test('abonos: reintento conserva respuesta histórica y rechaza claves incompati
 
 test('abonos: error SQL y conflictos de bloqueo revierten y liberan', async () => {
   for (const codigo of ['ER_PRUEBA', 'ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT']) {
-    const doble = prepararPool({ errorInsercion: Object.assign(new Error('Error simulado'), { code: codigo }) })
+    const opciones = codigo === 'ER_PRUEBA'
+      ? { errorActualizacion: Object.assign(new Error('Error simulado'), { code: codigo }) }
+      : { errorInsercion: Object.assign(new Error('Error simulado'), { code: codigo }) }
+    const doble = prepararPool(opciones)
     await assert.rejects(registrarAbono(doble.pool, 1, entrada, 42), codigo === 'ER_PRUEBA' ? { code: codigo } : { estado: 409 })
     assert.equal(doble.conexion.rollback.mock.callCount(), 1)
     assert.equal(doble.conexion.release.mock.callCount(), 1)
     assert.equal(doble.conexion.commit.mock.callCount(), 0)
+    assert.equal(doble.saldo(), '0.30')
   }
 })
 

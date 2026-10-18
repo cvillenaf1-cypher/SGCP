@@ -1,6 +1,7 @@
 # SGCP-8 · HU-03 · Registrar pagos realizados (backend)
 
-Registra abonos parciales o el pago total de una obligación. Esta entrega cubre
+Registra abonos parciales o el pago total de una obligación ya abonada por medios
+externos. SGCP únicamente deja constancia: no mueve dinero ni procesa pagos. Esta entrega cubre
 únicamente el backend: no incluye comprobantes, pantallas, funciones de gerente,
 infraestructura AWS ni otras historias.
 
