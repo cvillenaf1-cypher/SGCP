@@ -1,8 +1,8 @@
 import mysql from 'mysql2/promise'
 
-export function createPool(database) {
+export function crearConexiones(baseDatos) {
   return mysql.createPool({
-    ...database,
+    ...baseDatos,
     waitForConnections: true,
     connectionLimit: 5,
     queueLimit: 20,

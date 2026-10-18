@@ -1,46 +1,46 @@
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 
-export function loadEnvironment() {
+export function cargarEntorno() {
   dotenv.config({
     path: fileURLToPath(new URL('../.env', import.meta.url)),
     quiet: true,
   })
 }
 
-function integer(value, fallback, min, max, name) {
-  const number = Number(value ?? fallback)
-  if (!Number.isInteger(number) || number < min || number > max) {
-    throw new Error(`${name} debe ser un entero entre ${min} y ${max}.`)
+function entero(valor, predeterminado, minimo, maximo, nombre) {
+  const numero = Number(valor ?? predeterminado)
+  if (!Number.isInteger(numero) || numero < minimo || numero > maximo) {
+    throw new Error(`${nombre} debe ser un entero entre ${minimo} y ${maximo}.`)
   }
-  return number
+  return numero
 }
 
-export function readConfig(env = process.env) {
-  for (const name of ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD']) {
-    if (!env[name]?.trim()) throw new Error(`Falta configurar ${name}.`)
+export function leerConfiguracion(entorno = process.env) {
+  for (const nombre of ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD']) {
+    if (!entorno[nombre]?.trim()) throw new Error(`Falta configurar ${nombre}.`)
   }
-  const frontendUrl = env.FRONTEND_URL || 'http://localhost:5173'
-  const url = new URL(frontendUrl)
-  if (!['http:', 'https:'].includes(url.protocol) || url.origin !== frontendUrl) {
+  const urlInterfaz = entorno.FRONTEND_URL || 'http://localhost:5173'
+  const url = new URL(urlInterfaz)
+  if (!['http:', 'https:'].includes(url.protocol) || url.origin !== urlInterfaz) {
     throw new Error('FRONTEND_URL debe ser un origen HTTP(S), sin ruta ni barra final.')
   }
-  if (env.NODE_ENV === 'production' && url.protocol !== 'https:') {
+  if (entorno.NODE_ENV === 'production' && url.protocol !== 'https:') {
     throw new Error('FRONTEND_URL debe usar HTTPS en producción.')
   }
 
   return {
-    port: integer(env.PORT, 3000, 1, 65535, 'PORT'),
-    frontendUrl,
-    sessionMinutes: integer(env.SESSION_TTL_MINUTES, 60, 1, 1440, 'SESSION_TTL_MINUTES'),
+    port: entero(entorno.PORT, 3000, 1, 65535, 'PORT'),
+    frontendUrl: urlInterfaz,
+    sessionMinutes: entero(entorno.SESSION_TTL_MINUTES, 60, 1, 1440, 'SESSION_TTL_MINUTES'),
     loginLimit: 10,
     loginWindowMs: 15 * 60 * 1000,
     database: {
-      host: env.DB_HOST,
-      port: integer(env.DB_PORT, 3306, 1, 65535, 'DB_PORT'),
-      database: env.DB_NAME,
-      user: env.DB_USER,
-      password: env.DB_PASSWORD,
+      host: entorno.DB_HOST,
+      port: entero(entorno.DB_PORT, 3306, 1, 65535, 'DB_PORT'),
+      database: entorno.DB_NAME,
+      user: entorno.DB_USER,
+      password: entorno.DB_PASSWORD,
     },
   }
 }

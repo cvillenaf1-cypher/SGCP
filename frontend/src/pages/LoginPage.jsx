@@ -1,37 +1,37 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { useAuth } from '../auth/useAuth'
-import { homeForRole } from '../auth/AuthContext'
+import { useAutenticacion } from '../auth/useAuth'
+import { inicioPorRol } from '../auth/AuthContext'
 
-export function LoginPage() {
-  const { user, notice, signIn } = useAuth()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [fields, setFields] = useState({})
-  const [error, setError] = useState('')
-  const [pending, setPending] = useState(false)
+export function PaginaInicioSesion() {
+  const { usuario, aviso, iniciarSesion } = useAutenticacion()
+  const [correo, establecerCorreo] = useState('')
+  const [contrasena, establecerContrasena] = useState('')
+  const [campos, establecerCampos] = useState({})
+  const [error, establecerError] = useState('')
+  const [pendiente, establecerPendiente] = useState(false)
 
-  if (user) return <Navigate to={homeForRole(user.role)} replace />
+  if (usuario) return <Navigate to={inicioPorRol(usuario.role)} replace />
 
-  async function submit(event) {
-    event.preventDefault()
-    if (pending) return
-    const nextFields = {}
-    const normalized = email.trim().toLowerCase()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) || normalized.length > 254) nextFields.email = 'Ingresa un correo electrónico válido.'
-    if (!password || password.length > 128) nextFields.password = 'Ingresa una contraseña de hasta 128 caracteres.'
-    setFields(nextFields)
-    setError('')
-    if (Object.keys(nextFields).length) return
-    setPending(true)
+  async function enviarFormulario(evento) {
+    evento.preventDefault()
+    if (pendiente) return
+    const nuevosCampos = {}
+    const correoNormalizado = correo.trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoNormalizado) || correoNormalizado.length > 254) nuevosCampos.email = 'Ingresa un correo electrónico válido.'
+    if (!contrasena || contrasena.length > 128) nuevosCampos.password = 'Ingresa una contraseña de hasta 128 caracteres.'
+    establecerCampos(nuevosCampos)
+    establecerError('')
+    if (Object.keys(nuevosCampos).length) return
+    establecerPendiente(true)
     try {
-      await signIn(normalized, password)
-      setPassword('')
-    } catch (failure) {
-      setFields(failure.fields || {})
-      setError(failure.message)
+      await iniciarSesion(correoNormalizado, contrasena)
+      establecerContrasena('')
+    } catch (fallo) {
+      establecerCampos(fallo.fields || {})
+      establecerError(fallo.message)
     } finally {
-      setPending(false)
+      establecerPendiente(false)
     }
   }
 
@@ -39,20 +39,20 @@ export function LoginPage() {
     <section className="panel login-panel" aria-labelledby="login-title">
       <h2 id="login-title">Iniciar sesión</h2>
       <p className="description">Ingresa con tu cuenta de asistente o gerente.</p>
-      {notice && <p className="notice" role="status">{notice}</p>}
-      <form onSubmit={submit} noValidate aria-busy={pending}>
+      {aviso && <p className="notice" role="status">{aviso}</p>}
+      <form onSubmit={enviarFormulario} noValidate aria-busy={pendiente}>
         <div className="field">
           <label htmlFor="email">Correo electrónico</label>
-          <input id="email" name="email" type="email" autoComplete="username" maxLength={254} required value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(fields.email)} aria-describedby={fields.email ? 'email-error' : undefined} />
-          {fields.email && <p className="field-error" id="email-error">{fields.email}</p>}
+          <input id="email" name="email" type="email" autoComplete="username" maxLength={254} required value={correo} onChange={(evento) => establecerCorreo(evento.target.value)} aria-invalid={Boolean(campos.email)} aria-describedby={campos.email ? 'email-error' : undefined} />
+          {campos.email && <p className="field-error" id="email-error">{campos.email}</p>}
         </div>
         <div className="field">
           <label htmlFor="password">Contraseña</label>
-          <input id="password" name="password" type="password" autoComplete="current-password" maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} aria-invalid={Boolean(fields.password)} aria-describedby={fields.password ? 'password-error' : undefined} />
-          {fields.password && <p className="field-error" id="password-error">{fields.password}</p>}
+          <input id="password" name="password" type="password" autoComplete="current-password" maxLength={128} required value={contrasena} onChange={(evento) => establecerContrasena(evento.target.value)} aria-invalid={Boolean(campos.password)} aria-describedby={campos.password ? 'password-error' : undefined} />
+          {campos.password && <p className="field-error" id="password-error">{campos.password}</p>}
         </div>
         {error && <p className="error-message" role="alert">{error}</p>}
-        <button className="login-button" type="submit" disabled={pending}>{pending ? 'Ingresando…' : 'Ingresar'}</button>
+        <button className="login-button" type="submit" disabled={pendiente}>{pendiente ? 'Ingresando…' : 'Ingresar'}</button>
       </form>
       <p className="footnote">Por seguridad, al recargar o cerrar esta página deberás iniciar sesión nuevamente.</p>
     </section>

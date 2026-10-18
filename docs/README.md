@@ -14,10 +14,24 @@ Acceso por roles, sesiones en MySQL y paneles iniciales. Esta entrega técnica s
 asocia a la épica SGCP-1; no inventa una nueva historia de Jira ni declara completadas
 las ocho historias financieras.
 
+## Convenciones de desarrollo
+
+- Las funciones, métodos propios, variables, componentes, comentarios y documentación
+  nuevos se escriben en español. Los nombres existentes se traducen solo cuando sea
+  seguro, actualizando sus referencias y comprobando el acceso por roles.
+- Se conservan la sintaxis de JavaScript, los nombres de bibliotecas y sus métodos,
+  las rutas públicas, los contratos HTTP, las variables de entorno y el esquema de datos.
+  En los hooks propios se conserva el prefijo `use` requerido por las herramientas de React.
+- SGCP-1 ya funciona: los ajustes de nombres deben conservar el comportamiento del
+  inicio de sesión y los roles. Se reutilizan las herramientas y la configuración existentes.
+- Se trabaja con cambios pequeños, sin crear archivos `AGENTS.md`, sin fusiones
+  automáticas y sin modificar AWS.
+
 ## Próximas etapas
 
-Después de revisar y fusionar el PR de acceso: SGCP-6, SGCP-7, SGCP-8, SGCP-9,
-SGCP-10, SGCP-11, SGCP-12 y SGCP-13, cada una en su propia rama y PR.
+La siguiente historia oficial de Jira es **HU-01 | Registrar pagos pendientes (SGCP-6)**.
+Después continuarán SGCP-7, SGCP-8, SGCP-9, SGCP-10, SGCP-11, SGCP-12 y SGCP-13,
+cada una en su propia rama y PR.
 
 Se acordó adelantar el medio de pago obligatorio a SGCP-8 para no crear abonos
 históricos sin medio; SGCP-9 incorporará comprobantes y verificará sus criterios completos.

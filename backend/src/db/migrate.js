@@ -1,47 +1,47 @@
 import { createHash } from 'node:crypto'
 import { readdir, readFile } from 'node:fs/promises'
 
-const migrationsDirectory = new URL('../../../database/migrations/', import.meta.url)
+const directorioMigraciones = new URL('../../../database/migrations/', import.meta.url)
 
-export async function migrate(pool) {
-  const connection = await pool.getConnection()
-  let lockName
-  let locked = false
-  const applied = []
+export async function migrar(conexiones) {
+  const conexion = await conexiones.getConnection()
+  let nombreBloqueo
+  let bloqueado = false
+  const aplicadas = []
   try {
-    const [[{ name }]] = await connection.query('SELECT DATABASE() AS name')
-    lockName = `sgcp:migrate:${createHash('sha256').update(name).digest('hex').slice(0, 32)}`
-    const [[{ acquired }]] = await connection.execute('SELECT GET_LOCK(?, 10) AS acquired', [lockName])
-    if (Number(acquired) !== 1) throw new Error('No se pudo obtener el bloqueo de migraciones.')
-    locked = true
-    await connection.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    const [[{ name: nombre }]] = await conexion.query('SELECT DATABASE() AS name')
+    nombreBloqueo = `sgcp:migrate:${createHash('sha256').update(nombre).digest('hex').slice(0, 32)}`
+    const [[{ acquired: adquirido }]] = await conexion.execute('SELECT GET_LOCK(?, 10) AS acquired', [nombreBloqueo])
+    if (Number(adquirido) !== 1) throw new Error('No se pudo obtener el bloqueo de migraciones.')
+    bloqueado = true
+    await conexion.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
       name VARCHAR(255) PRIMARY KEY,
       checksum CHAR(64) NOT NULL,
       applied_at DATETIME(3) NOT NULL DEFAULT (UTC_TIMESTAMP(3))
     ) ENGINE=InnoDB`)
 
-    const files = (await readdir(migrationsDirectory)).filter((file) => /^\d{3}_[a-z0-9_]+\.sql$/.test(file)).sort()
-    for (const file of files) {
-      const sql = await readFile(new URL(file, migrationsDirectory), 'utf8')
-      const checksum = createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex')
-      const [previous] = await connection.execute('SELECT checksum FROM schema_migrations WHERE name = ?', [file])
-      if (previous.length) {
-        if (previous[0].checksum !== checksum) throw new Error(`La migración aplicada ${file} fue modificada.`)
+    const archivos = (await readdir(directorioMigraciones)).filter((archivo) => /^\d{3}_[a-z0-9_]+\.sql$/.test(archivo)).sort()
+    for (const archivo of archivos) {
+      const sql = await readFile(new URL(archivo, directorioMigraciones), 'utf8')
+      const sumaVerificacion = createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex')
+      const [anteriores] = await conexion.execute('SELECT checksum FROM schema_migrations WHERE name = ?', [archivo])
+      if (anteriores.length) {
+        if (anteriores[0].checksum !== sumaVerificacion) throw new Error(`La migración aplicada ${archivo} fue modificada.`)
         continue
       }
       // Migraciones SQL simples, sin procedimientos. MySQL hace commit implícito del DDL.
-      for (const statement of sql.split(/;\s*(?:\r?\n|$)/).map((part) => part.trim()).filter(Boolean)) {
-        await connection.query(statement)
+      for (const sentencia of sql.split(/;\s*(?:\r?\n|$)/).map((parte) => parte.trim()).filter(Boolean)) {
+        await conexion.query(sentencia)
       }
-      await connection.execute('INSERT INTO schema_migrations (name, checksum) VALUES (?, ?)', [file, checksum])
-      applied.push(file)
+      await conexion.execute('INSERT INTO schema_migrations (name, checksum) VALUES (?, ?)', [archivo, sumaVerificacion])
+      aplicadas.push(archivo)
     }
-    return applied
+    return aplicadas
   } finally {
     try {
-      if (locked) await connection.execute('SELECT RELEASE_LOCK(?)', [lockName])
+      if (bloqueado) await conexion.execute('SELECT RELEASE_LOCK(?)', [nombreBloqueo])
     } finally {
-      connection.release()
+      conexion.release()
     }
   }
 }

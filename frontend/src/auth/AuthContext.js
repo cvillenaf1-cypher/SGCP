@@ -1,4 +1,4 @@
 import { createContext } from 'react'
 
-export const AuthContext = createContext(null)
-export const homeForRole = (role) => role === 'ASISTENTE' ? '/asistente' : '/gerente'
+export const ContextoAutenticacion = createContext(null)
+export const inicioPorRol = (rol) => rol === 'ASISTENTE' ? '/asistente' : '/gerente'

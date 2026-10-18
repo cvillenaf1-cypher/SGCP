@@ -3,162 +3,162 @@ import { randomBytes } from 'node:crypto'
 import { after, before, test } from 'node:test'
 import argon2 from 'argon2'
 import request from 'supertest'
-import { createApp } from '../src/app.js'
-import { createUser, hashToken } from '../src/auth/service.js'
-import { migrate } from '../src/db/migrate.js'
-import { fixtureUser, openTestDatabase, removeFixture } from './support/database.js'
+import { crearAplicacion } from '../src/app.js'
+import { crearUsuario, calcularResumenToken } from '../src/auth/service.js'
+import { migrar } from '../src/db/migrate.js'
+import { crearUsuarioPrueba, abrirBasePruebas, eliminarUsuarioPrueba } from './support/database.js'
 
-let pool
-let config
-let app
-let assistant
-let manager
-const fixtures = []
+let conexiones
+let configuracion
+let aplicacion
+let asistente
+let gerente
+const usuariosPrueba = []
 
 before(async () => {
-  ;({ pool, config } = await openTestDatabase())
-  app = await createApp({ pool, config: { ...config, loginLimit: 100 } })
-  assistant = await fixtureUser(pool)
-  fixtures.push(assistant)
-  manager = await fixtureUser(pool, 'GERENTE')
-  fixtures.push(manager)
+  ;({ pool: conexiones, config: configuracion } = await abrirBasePruebas())
+  aplicacion = await crearAplicacion({ pool: conexiones, config: { ...configuracion, loginLimit: 100 } })
+  asistente = await crearUsuarioPrueba(conexiones)
+  usuariosPrueba.push(asistente)
+  gerente = await crearUsuarioPrueba(conexiones, 'GERENTE')
+  usuariosPrueba.push(gerente)
 })
 
 after(async () => {
-  if (!pool) return
-  try { for (const fixture of fixtures) await removeFixture(pool, fixture) } finally { await pool.end() }
+  if (!conexiones) return
+  try { for (const usuario of usuariosPrueba) await eliminarUsuarioPrueba(conexiones, usuario) } finally { await conexiones.end() }
 })
 
-async function login(user = assistant, target = app) {
-  return request(target).post('/api/auth/login').send({ email: user.email, password: user.password }).expect(200)
+async function iniciarSesion(usuario = asistente, destino = aplicacion) {
+  return request(destino).post('/api/auth/login').send({ email: usuario.email, password: usuario.password }).expect(200)
 }
 
 test('MySQL real: migraciones repetibles conservan usuarios y roles sin duplicar datos', async () => {
-  const [[before]] = await pool.query('SELECT COUNT(*) AS total FROM usuarios')
-  assert.deepEqual(await migrate(pool), [])
-  const [[after]] = await pool.query('SELECT COUNT(*) AS total FROM usuarios')
-  assert.equal(after.total, before.total)
-  const [roles] = await pool.query('SELECT codigo FROM roles ORDER BY codigo')
-  assert.deepEqual(roles.map((row) => row.codigo), ['ASISTENTE', 'GERENTE'])
-  const [[migration]] = await pool.execute('SELECT COUNT(*) AS total FROM schema_migrations WHERE name = ?', ['001_access.sql'])
-  assert.equal(Number(migration.total), 1)
+  const [[antes]] = await conexiones.query('SELECT COUNT(*) AS total FROM usuarios')
+  assert.deepEqual(await migrar(conexiones), [])
+  const [[despues]] = await conexiones.query('SELECT COUNT(*) AS total FROM usuarios')
+  assert.equal(despues.total, antes.total)
+  const [roles] = await conexiones.query('SELECT codigo FROM roles ORDER BY codigo')
+  assert.deepEqual(roles.map((fila) => fila.codigo), ['ASISTENTE', 'GERENTE'])
+  const [[migracion]] = await conexiones.execute('SELECT COUNT(*) AS total FROM schema_migrations WHERE name = ?', ['001_access.sql'])
+  assert.equal(Number(migracion.total), 1)
 })
 
 test('login conserva Argon2id y solo guarda el hash del token; /me no expone secretos', async () => {
-  const response = await login()
-  const { token, user, expiresAt } = response.body
+  const respuesta = await iniciarSesion()
+  const { token, user: usuario, expiresAt: vencimiento } = respuesta.body
   assert.match(token, /^[a-f0-9]{64}$/)
-  assert.deepEqual(user, { id: assistant.id, name: assistant.name, email: assistant.email, role: 'ASISTENTE' })
-  assert.ok(Date.parse(expiresAt) > Date.now())
-  assert.ok(Date.parse(expiresAt) <= Date.now() + config.sessionMinutes * 60000)
-  assert.equal(response.headers['cache-control'], 'no-store')
-  const [[stored]] = await pool.execute('SELECT password_hash FROM usuarios WHERE id = ?', [assistant.id])
-  assert.ok(stored.password_hash.startsWith('$argon2id$'))
-  assert.ok(await argon2.verify(stored.password_hash, assistant.password))
-  const [[session]] = await pool.execute('SELECT token_hash FROM sesiones WHERE token_hash = ?', [hashToken(token)])
-  assert.notEqual(session.token_hash, token)
-  const me = await request(app).get('/api/auth/me').auth(token, { type: 'bearer' }).expect(200)
-  assert.deepEqual(me.body, { user })
+  assert.deepEqual(usuario, { id: asistente.id, name: asistente.name, email: asistente.email, role: 'ASISTENTE' })
+  assert.ok(Date.parse(vencimiento) > Date.now())
+  assert.ok(Date.parse(vencimiento) <= Date.now() + configuracion.sessionMinutes * 60000)
+  assert.equal(respuesta.headers['cache-control'], 'no-store')
+  const [[almacenado]] = await conexiones.execute('SELECT password_hash FROM usuarios WHERE id = ?', [asistente.id])
+  assert.ok(almacenado.password_hash.startsWith('$argon2id$'))
+  assert.ok(await argon2.verify(almacenado.password_hash, asistente.password))
+  const [[sesion]] = await conexiones.execute('SELECT token_hash FROM sesiones WHERE token_hash = ?', [calcularResumenToken(token)])
+  assert.notEqual(sesion.token_hash, token)
+  const perfil = await request(aplicacion).get('/api/auth/me').auth(token, { type: 'bearer' }).expect(200)
+  assert.deepEqual(perfil.body, { user: usuario })
 })
 
 test('ambos roles pueden iniciar sesión y solo acceden a su panel; el rol del cliente no concede acceso', async () => {
-  for (const [user, allowed, denied] of [[assistant, 'asistente', 'gerente'], [manager, 'gerente', 'asistente']]) {
-    const { body } = await login(user)
-    await request(app).get(`/api/panel/${allowed}`).auth(body.token, { type: 'bearer' }).expect(200)
-    await request(app).get(`/api/panel/${denied}`).auth(body.token, { type: 'bearer' }).set('X-Role', denied.toUpperCase()).expect(403)
+  for (const [usuario, permitido, denegado] of [[asistente, 'asistente', 'gerente'], [gerente, 'gerente', 'asistente']]) {
+    const { body: cuerpo } = await iniciarSesion(usuario)
+    await request(aplicacion).get(`/api/panel/${permitido}`).auth(cuerpo.token, { type: 'bearer' }).expect(200)
+    await request(aplicacion).get(`/api/panel/${denegado}`).auth(cuerpo.token, { type: 'bearer' }).set('X-Role', denegado.toUpperCase()).expect(403)
   }
-  await request(app).post('/api/auth/login').send({ email: assistant.email, password: assistant.password, role: 'GERENTE' }).expect(422)
+  await request(aplicacion).post('/api/auth/login').send({ email: asistente.email, password: asistente.password, role: 'GERENTE' }).expect(422)
 })
 
 test('sin sesión, con token alterado o enviado como query se devuelve 401', async () => {
-  for (const path of ['/api/auth/me', '/api/panel/asistente', '/api/panel/gerente']) {
-    await request(app).get(path).expect(401)
-    await request(app).get(path).auth(randomBytes(32).toString('hex'), { type: 'bearer' }).expect(401)
+  for (const ruta of ['/api/auth/me', '/api/panel/asistente', '/api/panel/gerente']) {
+    await request(aplicacion).get(ruta).expect(401)
+    await request(aplicacion).get(ruta).auth(randomBytes(32).toString('hex'), { type: 'bearer' }).expect(401)
   }
-  const { body } = await login()
-  await request(app).get('/api/auth/me').query({ token: body.token }).expect(401)
+  const { body: cuerpo } = await iniciarSesion()
+  await request(aplicacion).get('/api/auth/me').query({ token: cuerpo.token }).expect(401)
 })
 
 test('usuario inexistente, contraseña incorrecta e inactivo producen el mismo error', async () => {
-  const inactive = await fixtureUser(pool)
-  fixtures.push(inactive)
-  await pool.execute('UPDATE usuarios SET activo = FALSE WHERE id = ?', [inactive.id])
-  const bodies = []
-  for (const credentials of [
-    { email: `missing-${randomBytes(8).toString('hex')}@example.test`, password: assistant.password },
-    { email: assistant.email, password: randomBytes(24).toString('hex') },
-    { email: inactive.email, password: inactive.password },
+  const inactivo = await crearUsuarioPrueba(conexiones)
+  usuariosPrueba.push(inactivo)
+  await conexiones.execute('UPDATE usuarios SET activo = FALSE WHERE id = ?', [inactivo.id])
+  const cuerpos = []
+  for (const credenciales of [
+    { email: `missing-${randomBytes(8).toString('hex')}@example.test`, password: asistente.password },
+    { email: asistente.email, password: randomBytes(24).toString('hex') },
+    { email: inactivo.email, password: inactivo.password },
   ]) {
-    const response = await request(app).post('/api/auth/login').send(credentials).expect(401)
-    bodies.push(response.body)
+    const respuesta = await request(aplicacion).post('/api/auth/login').send(credenciales).expect(401)
+    cuerpos.push(respuesta.body)
   }
-  assert.deepEqual(bodies[0], bodies[1])
-  assert.deepEqual(bodies[1], bodies[2])
+  assert.deepEqual(cuerpos[0], cuerpos[1])
+  assert.deepEqual(cuerpos[1], cuerpos[2])
 })
 
 test('logout revoca en MySQL y el token anterior deja de funcionar', async () => {
-  const { body } = await login()
-  await request(app).post('/api/auth/logout').auth(body.token, { type: 'bearer' }).expect(204)
-  await request(app).get('/api/auth/me').auth(body.token, { type: 'bearer' }).expect(401)
-  const [[session]] = await pool.execute('SELECT revocado_en FROM sesiones WHERE token_hash = ?', [hashToken(body.token)])
-  assert.ok(session.revocado_en)
+  const { body: cuerpo } = await iniciarSesion()
+  await request(aplicacion).post('/api/auth/logout').auth(cuerpo.token, { type: 'bearer' }).expect(204)
+  await request(aplicacion).get('/api/auth/me').auth(cuerpo.token, { type: 'bearer' }).expect(401)
+  const [[sesion]] = await conexiones.execute('SELECT revocado_en FROM sesiones WHERE token_hash = ?', [calcularResumenToken(cuerpo.token)])
+  assert.ok(sesion.revocado_en)
 })
 
 test('una sesión vencida se rechaza usando el reloj de MySQL', async () => {
-  const { body } = await login()
-  await pool.execute('UPDATE sesiones SET vence_en = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 1 SECOND) WHERE token_hash = ?', [hashToken(body.token)])
-  await request(app).get('/api/auth/me').auth(body.token, { type: 'bearer' }).expect(401)
+  const { body: cuerpo } = await iniciarSesion()
+  await conexiones.execute('UPDATE sesiones SET vence_en = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 1 SECOND) WHERE token_hash = ?', [calcularResumenToken(cuerpo.token)])
+  await request(aplicacion).get('/api/auth/me').auth(cuerpo.token, { type: 'bearer' }).expect(401)
 })
 
 test('desactivar al usuario invalida el acceso de una sesión existente', async () => {
-  const user = await fixtureUser(pool)
-  fixtures.push(user)
-  const { body } = await login(user)
-  await pool.execute('UPDATE usuarios SET activo = FALSE WHERE id = ?', [user.id])
-  await request(app).get('/api/auth/me').auth(body.token, { type: 'bearer' }).expect(401)
+  const usuario = await crearUsuarioPrueba(conexiones)
+  usuariosPrueba.push(usuario)
+  const { body: cuerpo } = await iniciarSesion(usuario)
+  await conexiones.execute('UPDATE usuarios SET activo = FALSE WHERE id = ?', [usuario.id])
+  await request(aplicacion).get('/api/auth/me').auth(cuerpo.token, { type: 'bearer' }).expect(401)
 })
 
 test('la autorización vuelve a consultar el rol en MySQL en cada petición', async () => {
-  const user = await fixtureUser(pool)
-  fixtures.push(user)
-  const { body } = await login(user)
-  await pool.execute('UPDATE usuarios SET rol_id = (SELECT id FROM roles WHERE codigo = ?) WHERE id = ?', ['GERENTE', user.id])
-  await request(app).get('/api/panel/asistente').auth(body.token, { type: 'bearer' }).expect(403)
-  await request(app).get('/api/panel/gerente').auth(body.token, { type: 'bearer' }).expect(200)
+  const usuario = await crearUsuarioPrueba(conexiones)
+  usuariosPrueba.push(usuario)
+  const { body: cuerpo } = await iniciarSesion(usuario)
+  await conexiones.execute('UPDATE usuarios SET rol_id = (SELECT id FROM roles WHERE codigo = ?) WHERE id = ?', ['GERENTE', usuario.id])
+  await request(aplicacion).get('/api/panel/asistente').auth(cuerpo.token, { type: 'bearer' }).expect(403)
+  await request(aplicacion).get('/api/panel/gerente').auth(cuerpo.token, { type: 'bearer' }).expect(200)
 })
 
 test('sesiones persisten al crear una nueva instancia de Express', async () => {
-  const { body } = await login()
-  const restarted = await createApp({ pool, config })
-  await request(restarted).get('/api/auth/me').auth(body.token, { type: 'bearer' }).expect(200)
+  const { body: cuerpo } = await iniciarSesion()
+  const reiniciada = await crearAplicacion({ pool: conexiones, config: configuracion })
+  await request(reiniciada).get('/api/auth/me').auth(cuerpo.token, { type: 'bearer' }).expect(200)
 })
 
 test('validación y consultas parametrizadas impiden usar entradas SQL como autenticación', async () => {
-  await request(app).post('/api/auth/login').send({}).expect(422)
-  await request(app).post('/api/auth/login').send({ email: {}, password: [] }).expect(422)
-  await request(app).post('/api/auth/login').send({ email: "x'OR'1'='1@example.test", password: assistant.password }).expect(401)
-  await request(app).post('/api/auth/login').set('Content-Type', 'application/json').send('{').expect(400)
-  await request(app).post('/api/auth/login').send({ email: assistant.email, password: 'x'.repeat(17000) }).expect(413)
+  await request(aplicacion).post('/api/auth/login').send({}).expect(422)
+  await request(aplicacion).post('/api/auth/login').send({ email: {}, password: [] }).expect(422)
+  await request(aplicacion).post('/api/auth/login').send({ email: "x'OR'1'='1@example.test", password: asistente.password }).expect(401)
+  await request(aplicacion).post('/api/auth/login').set('Content-Type', 'application/json').send('{').expect(400)
+  await request(aplicacion).post('/api/auth/login').send({ email: asistente.email, password: 'x'.repeat(17000) }).expect(413)
 })
 
 test('limitación de intentos fallidos devuelve 429 y Retry-After', async () => {
-  const limited = await createApp({ pool, config: { ...config, loginLimit: 2 } })
-  for (let i = 0; i < 2; i++) await request(limited).post('/api/auth/login').send({ email: assistant.email, password: 'incorrecta' }).expect(401)
-  const response = await request(limited).post('/api/auth/login').send({ email: assistant.email, password: assistant.password }).expect(429)
-  assert.ok(response.headers['retry-after'])
+  const limitada = await crearAplicacion({ pool: conexiones, config: { ...configuracion, loginLimit: 2 } })
+  for (let i = 0; i < 2; i++) await request(limitada).post('/api/auth/login').send({ email: asistente.email, password: 'incorrecta' }).expect(401)
+  const respuesta = await request(limitada).post('/api/auth/login').send({ email: asistente.email, password: asistente.password }).expect(429)
+  assert.ok(respuesta.headers['retry-after'])
 })
 
 test('el correo es único y la creación local nunca sobrescribe al usuario existente', async () => {
-  await assert.rejects(() => createUser(pool, { ...assistant, email: assistant.email.toUpperCase() }), { code: 'ER_DUP_ENTRY' })
-  await login(assistant)
+  await assert.rejects(() => crearUsuario(conexiones, { ...asistente, email: asistente.email.toUpperCase() }), { code: 'ER_DUP_ENTRY' })
+  await iniciarSesion(asistente)
 })
 
 test('health y CORS se conservan; respuestas autenticadas no se cachean', async () => {
-  const response = await request(app).get('/api/health').set('Origin', config.frontendUrl).expect(200)
-  assert.equal(response.body.status, 'ok')
-  assert.equal(response.headers['access-control-allow-origin'], config.frontendUrl)
-  assert.equal(response.headers['x-powered-by'], undefined)
-  const foreign = await request(app).options('/api/auth/login').set('Origin', 'https://otro.example').set('Access-Control-Request-Method', 'POST').expect(204)
-  assert.notEqual(foreign.headers['access-control-allow-origin'], 'https://otro.example')
-  await request(app).get('/api/no-existe').expect(404)
+  const respuesta = await request(aplicacion).get('/api/health').set('Origin', configuracion.frontendUrl).expect(200)
+  assert.equal(respuesta.body.status, 'ok')
+  assert.equal(respuesta.headers['access-control-allow-origin'], configuracion.frontendUrl)
+  assert.equal(respuesta.headers['x-powered-by'], undefined)
+  const externa = await request(aplicacion).options('/api/auth/login').set('Origin', 'https://otro.example').set('Access-Control-Request-Method', 'POST').expect(204)
+  assert.notEqual(externa.headers['access-control-allow-origin'], 'https://otro.example')
+  await request(aplicacion).get('/api/no-existe').expect(404)
 })
