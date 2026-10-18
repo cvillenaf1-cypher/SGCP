@@ -9,6 +9,7 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.test.example
 
 # Registros y temporales
 *.log
@@ -16,6 +17,11 @@ coverage/
 *.swp
 *.tsbuildinfo
 .cache/
+.local/
+playwright-report/
+test-results/
+*.pem
+*.key
 npm-debug.log*
 
 # Editores y sistema operativo

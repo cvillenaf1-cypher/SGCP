@@ -1,0 +1,33 @@
+CREATE TABLE IF NOT EXISTS roles (
+  id TINYINT UNSIGNED PRIMARY KEY,
+  codigo VARCHAR(20) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
+  CONSTRAINT chk_role_code CHECK (codigo IN ('ASISTENTE', 'GERENTE'))
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO roles (id, codigo) VALUES (1, 'ASISTENTE'), (2, 'GERENTE');
+
+CREATE TABLE IF NOT EXISTS usuarios (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  rol_id TINYINT UNSIGNED NOT NULL,
+  nombre VARCHAR(100) NOT NULL,
+  email VARCHAR(254) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL UNIQUE,
+  password_hash VARCHAR(255) CHARACTER SET ascii NOT NULL,
+  activo BOOLEAN NOT NULL DEFAULT TRUE,
+  creado_en DATETIME(3) NOT NULL DEFAULT (UTC_TIMESTAMP(3)),
+  CONSTRAINT fk_user_role FOREIGN KEY (rol_id) REFERENCES roles(id) ON DELETE RESTRICT,
+  CONSTRAINT chk_user_name CHECK (CHAR_LENGTH(TRIM(nombre)) > 0),
+  CONSTRAINT chk_user_hash CHECK (CHAR_LENGTH(password_hash) > 0),
+  CONSTRAINT chk_user_active CHECK (activo IN (0, 1))
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS sesiones (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  usuario_id INT UNSIGNED NOT NULL,
+  token_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
+  creado_en DATETIME(3) NOT NULL DEFAULT (UTC_TIMESTAMP(3)),
+  vence_en DATETIME(3) NOT NULL,
+  revocado_en DATETIME(3) NULL,
+  CONSTRAINT fk_session_user FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+  INDEX idx_session_user (usuario_id),
+  INDEX idx_session_expiry (vence_en)
+) ENGINE=InnoDB;
