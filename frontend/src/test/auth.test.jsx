@@ -57,6 +57,7 @@ describe('Acceso SGCP', () => {
       expect(localStorage.length).toBe(0)
       expect(sessionStorage.length).toBe(0)
       if (rol === 'GERENTE') {
+        expect(screen.queryByRole('button', { name: 'Registrar pagos realizados' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Consultar pagos pendientes' })).not.toBeInTheDocument()
         expect(screen.getByText('Solo lectura')).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Registrar pago pendiente' })).not.toBeInTheDocument()
@@ -98,6 +99,21 @@ describe('Acceso SGCP', () => {
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
     const llamada = fetch.mock.calls.find(([url]) => url.endsWith('/api/obligaciones'))
     expect(llamada[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
+  })
+
+  it('ASISTENTE abre HU-03 con sesión y consulta sus obligaciones con Bearer', async () => {
+    fetch.mockResolvedValueOnce(respuesta(sesionPrueba()))
+      .mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' }))
+      .mockResolvedValue(respuesta({ obligaciones: [] }))
+    renderizarAplicacion()
+    const usuario = await completarInicioSesion()
+    await screen.findByText('Acceso habilitado.')
+    await usuario.click(screen.getByRole('button', { name: 'Registrar pagos realizados' }))
+    expect(await screen.findByRole('heading', { name: 'Registrar pagos realizados' })).toBeInTheDocument()
+    await screen.findByText('Todavía no hay obligaciones registradas. Registra primero un pago pendiente.')
+    const llamada = fetch.mock.calls.find(([url]) => url.endsWith('/api/obligaciones'))
+    expect(llamada[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
+    expect(fetch.mock.calls.filter(([, opciones]) => opciones.method === 'POST')).toHaveLength(1)
   })
 
   it('cierra sesión en el servidor y vuelve al login', async () => {
