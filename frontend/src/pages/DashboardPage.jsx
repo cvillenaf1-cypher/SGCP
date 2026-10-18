@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAutenticacion } from '../auth/useAuth'
+import { FormularioPagoPendiente } from '../components/FormularioPagoPendiente'
 
 export function PaginaPanel({ role: rol }) {
   const { solicitar } = useAutenticacion()
@@ -23,12 +24,12 @@ export function PaginaPanel({ role: rol }) {
       {estado.cargando && <p role="status">Verificando acceso con el servidor…</p>}
       {estado.error && <p className="error-message" role="alert">{estado.error}</p>}
       {estado.mensaje && <p className="success-message" role="status">{estado.mensaje}</p>}
-      <div className="empty-state">
+      {esAsistente ? <FormularioPagoPendiente /> : <div className="empty-state">
         <h3>Tu espacio de trabajo está preparado</h3>
         <p>{esAsistente
           ? 'En las siguientes entregas podrás registrar obligaciones, consultar saldos y registrar abonos realizados fuera del sistema.'
           : 'En las siguientes entregas podrás consultar obligaciones por mes, resúmenes económicos y alertas globales de vencimiento.'}</p>
-      </div>
+      </div>}
     </section>
   )
 }

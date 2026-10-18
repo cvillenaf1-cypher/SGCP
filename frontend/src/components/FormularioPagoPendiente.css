@@ -1,0 +1,9 @@
+.registro-pago { margin-top: 28px; border-top: 1px solid #dce5ef; padding-top: 24px; }
+.registro-pago h3 { margin: 0; font-size: 1.25rem; }
+.registro-pago-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.registro-pago .field { margin: 12px 0 20px; align-content: start; }
+.registro-pago small { line-height: 1.5; }
+@media (max-width: 600px) {
+  .registro-pago-campos { grid-template-columns: minmax(0, 1fr); }
+  .registro-pago button { width: 100%; }
+}
