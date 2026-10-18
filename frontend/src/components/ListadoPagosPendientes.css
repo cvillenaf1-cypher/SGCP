@@ -1,0 +1,34 @@
+.consulta-navegacion { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.consulta-navegacion [aria-pressed='true'] { background: #2458b8; color: #fff; }
+.consulta-pagos { min-width: 0; margin-top: 28px; padding-top: 24px; border-top: 1px solid #dce5ef; }
+.consulta-pagos h3 { margin: 0; font-size: 1.25rem; }
+.consulta-controles { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 16px; margin: 22px 0; }
+.consulta-controles .field { min-width: 0; margin: 0; }
+.consulta-controles select, .consulta-controles > button { min-height: 50px; }
+.consulta-controles select { width: 100%; padding: 12px; border: 1px solid #8b9cb2; border-radius: 8px; font: inherit; color: #1d2b40; background: #fff; }
+.consulta-controles select:focus-visible, .consulta-tabla-contenedor:focus-visible { outline: 3px solid #809fe0; outline-offset: 3px; }
+.consulta-tabla-contenedor { max-width: 100%; overflow-x: auto; border: 1px solid #dce5ef; border-radius: 12px; }
+.consulta-tabla { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.consulta-tabla caption { padding: 12px; text-align: left; color: #526176; }
+.consulta-tabla th, .consulta-tabla td { padding: 12px; border-top: 1px solid #dce5ef; text-align: left; vertical-align: top; }
+.consulta-tabla thead { background: #f0f4fa; }
+.consulta-tabla th[scope='row'], .consulta-tabla td:nth-child(2) { min-width: 140px; max-width: 250px; overflow-wrap: anywhere; }
+.consulta-importe { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.consulta-estados { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.consulta-estado, .consulta-vencida { padding: 3px 8px; border-radius: 6px; font-size: .85rem; font-weight: 600; }
+.consulta-estado-pendiente { background: #e8f0ff; color: #234b91; }
+.consulta-estado-parcial { background: #fff6dc; color: #6b4b00; }
+.consulta-estado-pagado { background: #e7f6ec; color: #166534; }
+.consulta-vencida { background: #fff1f1; color: #a32323; }
+.consulta-detalle { margin-top: 24px; padding: 20px; border: 1px solid #dce5ef; border-radius: 12px; background: #f8faff; overflow-wrap: anywhere; }
+.consulta-detalle h4 { margin: 0 0 16px; font-size: 1.1rem; }
+.consulta-detalle dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 0; }
+.consulta-detalle dt { font-weight: 600; }
+.consulta-detalle dd { margin: 4px 0 0; }
+@media (max-width: 600px) {
+  .consulta-controles { grid-template-columns: minmax(0, 1fr); }
+  .consulta-navegacion button { width: 100%; }
+  .consulta-detalle dl { grid-template-columns: minmax(0, 1fr); }
+}
+#root:has(.consulta-pagos) { grid-template-columns: minmax(0, 1fr); }
+.app-shell:has(.consulta-pagos) { min-width: 0; }
