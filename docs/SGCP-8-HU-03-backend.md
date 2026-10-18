@@ -50,6 +50,41 @@ El identificador es un entero canónico entre `1` y `4294967295`.
 - No enviar campos adicionales ni valores de servidor como saldo, registrador o
   fecha.
 
+### Adaptación a la interfaz HU-03 de Quinde
+
+La interfaz integrada aún solo consulta y valida: no envía solicitudes de
+escritura. Al conectarla, conservar los nombres camelCase locales del formulario
+y construir un objeto para la API con estos nombres exactos:
+
+| Interfaz | API |
+| --- | --- |
+| obligación seleccionada (`obligacion.id`) | segmento `:id` de la ruta |
+| `montoAbono` | `monto` |
+| `medioPago` | `medio_pago` |
+| clave aleatoria de la operación | `clave_idempotencia` |
+
+Los cuatro valores del selector coinciden exactamente con los permitidos por el
+backend; no necesitan traducción. La petición puede hacerse con el cliente
+existente: `solicitar(`/api/obligaciones/${id}/abonos`, { method: 'POST', body })`.
+El cliente agrega la sesión Bearer y `Content-Type: application/json`.
+
+Generar una clave aleatoria nueva (por ejemplo `crypto.randomUUID()`) para cada
+abono nuevo y conservar la misma clave y cuerpo al reintentar ese abono, en
+particular después de un error de red de resultado incierto. Crear otra clave
+solo cuando el asistente comience una operación diferente. Mientras una
+solicitud esté en curso, deshabilitar el envío repetido; la clave persistente
+sigue siendo necesaria para cubrir reintentos fuera de ese periodo.
+
+Para `422`, el servidor devuelve `fields.monto`, `fields.medio_pago` y/o
+`fields.id`, que la interfaz puede asociar a `montoAbono`, `medioPago` y la
+selección de obligación. También puede devolver `fields.form` para un cuerpo con
+campos no permitidos. Mostrar `message` para conflictos `404`/`409` y demás
+errores no asociados a un campo. Si un abono devuelve `409` por saldo insuficiente
+o la obligación ya pagada, volver a consultar `GET /api/obligaciones/:id` y
+actualizar saldo y estado desde la respuesta del servidor; no reutilizar el
+saldo que se mostró antes del envío. Tras `201` o un reintento `200`, refrescar
+también el detalle para representar el saldo y estado económicos vigentes.
+
 Respuesta de creación, HTTP `201`:
 
 ```json
