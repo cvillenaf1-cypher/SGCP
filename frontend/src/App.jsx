@@ -5,6 +5,8 @@ import { inicioPorRol } from './auth/AuthContext'
 import { RequerirRol } from './auth/RequireRole'
 import { PaginaInicioSesion } from './pages/LoginPage'
 import { PaginaPanel } from './pages/DashboardPage'
+import { PaginaGerente } from './gerente/PaginaGerente'
+import { PaginaPagosDelMes } from './gerente/PaginaPagosDelMes'
 import './App.css'
 
 function Aplicacion() {
@@ -44,7 +46,8 @@ function Aplicacion() {
             <Route path="/asistente" element={<PaginaPanel role="ASISTENTE" />} />
           </Route>
           <Route element={<RequerirRol role="GERENTE" />}>
-            <Route path="/gerente" element={<PaginaPanel role="GERENTE" />} />
+            <Route path="/gerente" element={<PaginaGerente />} />
+            <Route path="/gerente/pagos-del-mes" element={<PaginaPagosDelMes />} />
           </Route>
           <Route path="*" element={<section className="panel"><h2>Página no encontrada</h2><Link to="/">Volver al inicio</Link></section>} />
         </Routes>
