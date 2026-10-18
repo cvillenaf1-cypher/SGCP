@@ -57,6 +57,7 @@ describe('Acceso SGCP', () => {
       expect(localStorage.length).toBe(0)
       expect(sessionStorage.length).toBe(0)
       if (rol === 'GERENTE') {
+        expect(screen.queryByRole('button', { name: 'Consultar pagos pendientes' })).not.toBeInTheDocument()
         expect(screen.getByText('Solo lectura')).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Registrar pago pendiente' })).not.toBeInTheDocument()
         await userEvent.click(screen.getByText('Ir a asistente (prueba)'))
@@ -84,6 +85,19 @@ describe('Acceso SGCP', () => {
     await completarInicioSesion()
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Tu sesión venció')
+  })
+
+  it('ASISTENTE navega a consulta con Bearer y un 401 de obligaciones devuelve al login', async () => {
+    fetch.mockResolvedValueOnce(respuesta(sesionPrueba()))
+      .mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' }))
+      .mockResolvedValue(respuesta({ message: 'Sesión vencida.' }, 401))
+    renderizarAplicacion()
+    const usuario = await completarInicioSesion()
+    await screen.findByText('Acceso habilitado.')
+    await usuario.click(screen.getByRole('button', { name: 'Consultar pagos pendientes' }))
+    expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
+    const llamada = fetch.mock.calls.find(([url]) => url.endsWith('/api/obligaciones'))
+    expect(llamada[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
   })
 
   it('cierra sesión en el servidor y vuelve al login', async () => {
