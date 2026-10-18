@@ -7,6 +7,8 @@ import { crearServicioAutenticacion } from './auth/service.js'
 import { ROLES, validarInicioSesion } from './auth/validation.js'
 import { registrarObligacion } from './obligaciones/servicio.js'
 import { validarObligacion } from './obligaciones/validacion.js'
+import { listarObligaciones, obtenerObligacion } from './obligaciones/consulta.js'
+import { validarFiltroConsulta, validarIdentificadorObligacion } from './obligaciones/validacion-consulta.js'
 
 export async function crearAplicacion({ pool: conexiones, config: configuracion }) {
   const aplicacion = express()
@@ -50,6 +52,21 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion 
     if (Object.keys(campos).length) return respuesta.status(422).json({ message: 'Revisa los datos del formulario.', fields: campos })
     const obligacion = await registrarObligacion(conexiones, entrada, solicitud.auth.user.id)
     respuesta.status(201).json({ message: 'Obligación registrada correctamente.', obligacion })
+  })
+
+  aplicacion.get('/api/obligaciones', requerirSesion, autorizar(ROLES.ASISTENTE), async (solicitud, respuesta) => {
+    const { filtro, fields: campos } = validarFiltroConsulta(solicitud.query)
+    if (Object.keys(campos).length) return respuesta.status(422).json({ message: 'Revisa los datos de la consulta.', fields: campos })
+    const obligaciones = await listarObligaciones(conexiones, filtro)
+    respuesta.json({ obligaciones })
+  })
+
+  aplicacion.get('/api/obligaciones/:id', requerirSesion, autorizar(ROLES.ASISTENTE), async (solicitud, respuesta) => {
+    const { id, fields: campos } = validarIdentificadorObligacion(solicitud.params.id)
+    if (Object.keys(campos).length) return respuesta.status(422).json({ message: 'Revisa los datos de la consulta.', fields: campos })
+    const obligacion = await obtenerObligacion(conexiones, id)
+    if (!obligacion) return respuesta.status(404).json({ message: 'Obligación no encontrada.' })
+    respuesta.json({ obligacion })
   })
 
   // Paneles iniciales: permiten comprobar autorización real sin adelantar historias financieras.
