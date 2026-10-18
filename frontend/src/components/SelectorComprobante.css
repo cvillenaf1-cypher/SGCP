@@ -1,0 +1,5 @@
+.comprobante { margin: 8px 0 24px; padding-top: 20px; border-top: 1px solid #dce5ef; }
+.comprobante h4 { margin: 0; font-size: 1.1rem; }
+.comprobante-nombre { overflow-wrap: anywhere; }
+.comprobante-imagen { display: block; max-width: 100%; max-height: 320px; object-fit: contain; border: 1px solid #dce5ef; border-radius: 8px; margin-top: 16px; }
+.comprobante input[type='file'] { max-width: 100%; font-size: .9rem; }
