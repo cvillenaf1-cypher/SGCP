@@ -56,7 +56,15 @@ describe('Acceso SGCP', () => {
       expect(fetch.mock.calls[1][1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
       expect(localStorage.length).toBe(0)
       expect(sessionStorage.length).toBe(0)
-      if (rol === 'GERENTE') expect(screen.getByText('Solo lectura')).toBeInTheDocument()
+      if (rol === 'GERENTE') {
+        expect(screen.getByText('Solo lectura')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Registrar pago pendiente' })).not.toBeInTheDocument()
+        await userEvent.click(screen.getByText('Ir a asistente (prueba)'))
+        expect(screen.getByRole('heading', { name: 'Acceso no permitido' })).toBeInTheDocument()
+        expect(screen.queryByLabelText('Concepto del pago')).not.toBeInTheDocument()
+      } else {
+        expect(screen.getByLabelText('Concepto del pago')).toBeInTheDocument()
+      }
     })
   }
 
