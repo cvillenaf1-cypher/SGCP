@@ -1,0 +1,19 @@
+.registro-abono { margin-top: 28px; padding-top: 24px; border-top: 1px solid #dce5ef; }
+.registro-abono h3 { margin: 0; font-size: 1.25rem; }
+.registro-abono select { width: 100%; min-width: 0; min-height: 50px; padding: 12px; border: 1px solid #8b9cb2; border-radius: 8px; color: #1d2b40; background: #fff; font: inherit; }
+.registro-abono select:focus-visible { outline: 3px solid #b1c7ef; outline-offset: 1px; }
+.registro-abono select[aria-invalid='true'] { border-color: #a32323; }
+.abono-seleccion { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; margin: 22px 0; }
+.abono-seleccion .field { margin: 0; min-width: 0; }
+.abono-seleccion > button { min-height: 50px; margin-top: 34px; }
+.abono-campos, .abono-resumen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.abono-campos .field { align-content: start; }
+.abono-resumen { padding: 20px; border: 1px solid #dce5ef; border-radius: 12px; background: #f8faff; gap: 16px 24px; overflow-wrap: anywhere; }
+.abono-resumen dt { font-weight: 600; }
+.abono-resumen dd { margin: 4px 0 0; }
+.registro-abono small { line-height: 1.5; }
+@media (max-width: 600px) {
+  .abono-seleccion, .abono-campos, .abono-resumen { grid-template-columns: minmax(0, 1fr); }
+  .abono-seleccion > button { margin-top: 0; }
+  .registro-abono button { width: 100%; }
+}
