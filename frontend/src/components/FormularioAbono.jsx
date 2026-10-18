@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAutenticacion } from '../auth/useAuth'
 import { convertirACentimos, mediosPago, validarAbono } from '../lib/validarAbono'
 import { formatearImporte } from '../lib/formatearImporte'
+import { SelectorComprobante } from './SelectorComprobante'
 import './FormularioAbono.css'
 
 function DatosObligacionAbono({ identificador }) {
@@ -14,6 +15,8 @@ function DatosObligacionAbono({ identificador }) {
   const [mensajeError, establecerMensajeError] = useState('')
   const [guardando, establecerGuardando] = useState(false)
   const [operacionPendiente, establecerOperacionPendiente] = useState(null)
+  const [comprobante, establecerComprobante] = useState(null)
+  const [errorComprobante, establecerErrorComprobante] = useState('')
   const formulario = useRef(null)
   const envioEnCurso = useRef(false)
   const operacionPendienteRef = useRef(null)
@@ -39,6 +42,15 @@ function DatosObligacionAbono({ identificador }) {
     if (envioEnCurso.current) return
     establecerAviso('')
     establecerMensajeError('')
+
+    if (errorComprobante) {
+      formulario.current.elements.namedItem('comprobante')?.focus()
+      return
+    }
+    if (comprobante) {
+      establecerMensajeError('El comprobante no se puede subir todavía. No se registró el abono. Quita el archivo si deseas registrar el abono sin comprobante.')
+      return
+    }
 
     let operacion = operacionPendienteRef.current
     if (!operacion) {
@@ -158,6 +170,8 @@ function DatosObligacionAbono({ identificador }) {
           {errores.medioPago && <p className="field-error" id="error-medio-abono">{errores.medioPago}</p>}
         </div>
       </div>
+      <SelectorComprobante archivo={comprobante} error={errorComprobante} deshabilitado={guardando || Boolean(operacionPendiente)}
+        alCambiar={(archivo, error) => { establecerComprobante(archivo); establecerErrorComprobante(error); establecerAviso(''); establecerMensajeError('') }} />
       {errores.obligacion && <p className="error-message" role="alert">{errores.obligacion}</p>}
       <button type="submit" disabled={guardando}>{guardando ? 'Registrando abono…' : operacionPendiente ? 'Reintentar registro' : 'Registrar abono'}</button>
     </form>}
