@@ -22,11 +22,14 @@ test.beforeAll(async ({ request: solicitudes }) => {
 test.afterAll(async () => {
   if (!identificador) return
   const { pool: conexiones } = await abrirBasePruebas()
-  try { await conexiones.execute('DELETE FROM obligaciones WHERE id = ? AND usuario_creador_id = ?', [identificador, usuario.id]) }
+  try {
+    await conexiones.execute('DELETE FROM abonos WHERE obligacion_id = ?', [identificador])
+    await conexiones.execute('DELETE FROM obligaciones WHERE id = ? AND usuario_creador_id = ?', [identificador, usuario.id])
+  }
   finally { await conexiones.end() }
 })
 
-test('HU-03 consulta saldos reales y valida sin guardar mientras falta el backend de abonos', async ({ page: pagina }) => {
+test('HU-03 registra abonos parciales y completos y actualiza el saldo real', async ({ page: pagina }) => {
   await pagina.goto('/#/login')
   await pagina.getByLabel('Correo electrónico').fill(usuario.email)
   await pagina.getByLabel('Contraseña', { exact: true }).fill(usuario.password)
@@ -36,24 +39,42 @@ test('HU-03 consulta saldos reales y valida sin guardar mientras falta el backen
   await pagina.getByLabel('Pago pendiente', { exact: true }).selectOption(String(identificador))
   await expect(pagina.getByLabel('Monto del abono (S/)')).toBeVisible()
   const escrituras = []
-  pagina.on('request', (solicitud) => { if (solicitud.method() === 'POST') escrituras.push(solicitud.url()) })
-  await pagina.getByRole('button', { name: 'Validar abono' }).click()
+  pagina.on('request', (solicitud) => {
+    if (solicitud.method() === 'POST') escrituras.push({ url: solicitud.url(), body: solicitud.postDataJSON() })
+  })
+  await pagina.getByRole('button', { name: 'Registrar abono' }).click()
   await expect(pagina.getByText('Ingresa el monto del abono en soles.', { exact: true })).toBeVisible()
   await expect(pagina.getByText('Selecciona el medio de pago utilizado.', { exact: true })).toBeVisible()
   await pagina.getByLabel('Monto del abono (S/)').fill('120.51')
   await pagina.getByLabel('Medio de pago', { exact: true }).selectOption('Efectivo')
-  await pagina.getByRole('button', { name: 'Validar abono' }).click()
+  await pagina.getByRole('button', { name: 'Registrar abono' }).click()
   await expect(pagina.getByText('El abono no puede superar el saldo pendiente.', { exact: true })).toBeVisible()
-  await pagina.getByLabel('Monto del abono (S/)').fill('120.50')
-  for (let pulsacion = 0; pulsacion < 3; pulsacion++) await pagina.getByRole('button', { name: 'Validar abono' }).click()
-  await expect(pagina.getByRole('status').filter({ hasText: 'Los datos del abono son válidos.' })).toContainText('no se guardó ningún movimiento ni se modificó el saldo')
-  expect(escrituras).toEqual([])
+  await pagina.getByLabel('Monto del abono (S/)').fill('25.50')
+  await pagina.getByRole('button', { name: 'Registrar abono' }).click()
+  await expect(pagina.getByText('Abono registrado correctamente.')).toBeVisible()
+  await expect(pagina.getByText('S/ 95.00')).toBeVisible()
+  await pagina.getByLabel('Monto del abono (S/)').fill('95.00')
+  await pagina.getByLabel('Medio de pago', { exact: true }).selectOption('Transferencia bancaria')
+  await pagina.getByRole('button', { name: 'Registrar abono' }).click()
+  await expect(pagina.getByText('Abono registrado correctamente.')).toBeVisible()
+  await expect(pagina.getByText('PAGADO')).toBeVisible()
+  await expect(pagina.getByText('S/ 0.00')).toBeVisible()
+  expect(escrituras).toHaveLength(2)
+  expect(escrituras[0].url).toContain(`/api/obligaciones/${identificador}/abonos`)
+  expect(escrituras[0].body).toMatchObject({
+    monto: '25.50',
+    medio_pago: 'Efectivo',
+    clave_idempotencia: expect.any(String),
+  })
+  expect(escrituras[0].body.clave_idempotencia).not.toBe(escrituras[1].body.clave_idempotencia)
   const { pool: conexiones } = await abrirBasePruebas()
   try {
     const [[fila]] = await conexiones.execute('SELECT saldo_pendiente FROM obligaciones WHERE id = ?', [identificador])
-    expect(fila.saldo_pendiente).toBe('120.50')
+    expect(fila.saldo_pendiente).toBe('0.00')
+    const [[abonos]] = await conexiones.execute('SELECT COUNT(*) AS cantidad, SUM(monto) AS total FROM abonos WHERE obligacion_id = ?', [identificador])
+    expect(Number(abonos.cantidad)).toBe(2)
+    expect(abonos.total).toBe('120.50')
   } finally { await conexiones.end() }
   await pagina.setViewportSize({ width: 390, height: 844 })
-  await expect(pagina.getByLabel('Monto del abono (S/)')).toBeVisible()
   expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })

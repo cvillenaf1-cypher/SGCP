@@ -5,18 +5,17 @@ avance rápido a `d764242`. HU-01 y HU-02 ya están integradas en esa base.
 
 ## Estado de la entrega
 
-Interfaz y validaciones preparadas. El registro real de abonos sigue PENDIENTE:
-no existe un módulo de abonos de Haro en el `origin/main` revisado. No se inventó
-una ruta, un formato JSON ni una respuesta de guardado.
+La interfaz consulta obligaciones reales y permite registrar abonos mediante el
+backend HU-03 de Haro. La integración local está preparada para revisión de Quinde;
+no se ha publicado en su rama ni en `main`.
 
 La pantalla aparece exclusivamente dentro del panel ASISTENTE, mediante
 **Registrar pagos realizados**. Permite consultar obligaciones reales, seleccionar
 una con saldo positivo, ver concepto, beneficiario, monto original, saldo actual,
 estado y vencimiento, e ingresar monto y medio de pago obligatorio.
 
-Se ofrecen Efectivo, Transferencia bancaria, Tarjeta y Billetera digital. Estas
-etiquetas son valores de interfaz; su traducción al contrato de escritura queda
-pendiente de los nombres y valores que entregue Haro.
+Se ofrecen Efectivo, Transferencia bancaria, Tarjeta y Billetera digital. Los
+valores coinciden con el backend y se envían sin traducción.
 
 Los montos se comparan con centavos enteros mediante BigInt. Se rechazan campos
 vacíos, cero, negativos, más de dos decimales, formato inválido y montos superiores
@@ -27,64 +26,54 @@ Se descartan respuestas de detalles anteriores al cambiar de selección.
 Hay estados de carga, errores, reintentos, negocio vacío y ausencia de obligaciones
 con saldo. Saldo, estado y fecha automática del abono no son editables.
 
-El botón **Validar abono** comprueba los datos y muestra expresamente que no se
-guardó ningún movimiento. No hay confirmación falsa ni modificación del saldo.
-No se incorporaron comprobantes ni historial (HU-04 y HU-05).
+El botón **Registrar abono** envía la operación autenticada. Solo muestra la
+confirmación que devuelve el servidor, y vuelve a consultar el detalle para
+actualizar saldo y estado. Un conflicto `409` muestra el error del servidor y
+refresca el saldo antes de permitir otra operación.
+
+La interfaz transforma `montoAbono` y `medioPago` a `monto` y `medio_pago`, y
+genera `clave_idempotencia` con `crypto.randomUUID()`. Si la respuesta de red no
+permite confirmar el resultado, conserva el cuerpo y la clave originales para
+reintentar; bloquea los campos y el doble envío hasta que el servidor confirme la
+operación o responda con un error que permita corregirla. No se incorporaron
+comprobantes ni historial (HU-04 y HU-05).
 
 ## Archivos
 
-- `src/components/FormularioAbono.jsx`: selección, consulta de saldo y formulario.
+- `src/components/FormularioAbono.jsx`: integración de escritura autenticada,
+  estado de envío, clave idempotente, tratamiento de errores y refresco del saldo.
 - `src/components/FormularioAbono.css`: estilos y adaptación móvil.
 - `src/lib/validarAbono.js`: validación de importes y medios.
 - `src/components/FuncionesAsistente.jsx`: navegación de HU-03.
-- `src/test/abonos.test.jsx`: validación y pruebas del formulario.
+- `src/test/abonos.test.jsx`: validación y pruebas de contrato, éxito parcial/total,
+  prevención de doble envío, reintento, errores y refresco del saldo.
 - `src/test/auth.test.jsx`: navegación autenticada y exclusión del GERENTE.
-- `e2e/abonos.spec.js`: consultas reales y validación sin escritura.
+- `e2e/abonos.spec.js`: registro real parcial y total, y verificación de saldo e
+  historial persistidos en MySQL.
 - `ENTREGA-HU-03.md`: este informe.
 
-## Conexión y pendientes
+## Contrato y cambios de integración para revisión de Quinde
 
-Ya conectadas las lecturas de Joel: `GET /api/obligaciones` y
-`GET /api/obligaciones/:id`, mediante la sesión y cliente HTTP existentes.
-No hay datos simulados en el componente: los saldos proceden de la API.
-Las respuestas simuladas se limitan a las pruebas de componentes. Los ejemplos
-que puedan verse en la instancia local son filas de prueba, excluidas de Git.
+El endpoint real es `POST /api/obligaciones/:id/abonos`. El JSON requiere
+`monto` (cadena decimal), `medio_pago` (una de las cuatro etiquetas existentes)
+y `clave_idempotencia` (UUID seguro para la operación). `useAutenticacion().solicitar`
+envía el token Bearer y el cliente API serializa el cuerpo como JSON. El backend
+responde `201` al registrar y `200` al repetir la misma operación; las claves
+reutilizadas con otros datos y los conflictos de saldo responden `409`.
 
-Haro debe entregar el endpoint de registro de abonos: método, ruta, campos,
-valores aceptados para medio de pago, respuesta correcta, errores por campo y
-mecanismo de idempotencia/concurrencia. Entonces se conectará el guardado, su estado
-de carga, bloqueo de envíos repetidos mientras se procesa, confirmación real y
-actualización del saldo y estado a partir del servidor. Esos criterios aún no
-están cumplidos ni se declaran probados. Por ahora ninguna pulsación del botón
-genera una escritura, incluso si se pulsa repetidamente.
+Los cambios locales de Quinde se limitan al componente, sus pruebas unitarias,
+la prueba E2E y esta documentación; requieren su revisión antes de publicar.
+No se modificó la validación del formulario ni se añadieron dependencias.
 
 ## Pruebas ejecutadas
 
-- `npm.cmd test` en frontend: 67 pruebas aprobadas en 4 archivos; incluye las
-  regresiones de login, HU-01 y HU-02.
-- `npm.cmd run lint`: aprobado sin advertencias.
-- `npm.cmd run build`: aprobado.
-- Playwright con Edge, Express y MySQL real: 2 pruebas aprobadas
-  (`abonos.spec.js` y `consulta-pagos.spec.js`). La de HU-03 verifica consulta,
-  medio obligatorio, abono superior al saldo, validación correcta, pulsaciones
-  repetidas sin POST, saldo sin cambios en MySQL y ancho móvil de 390 px.
-- Recorrido adicional en la instancia local: selección de una obligación parcial,
-  pagadas bloqueadas, error por exceso y validación del monto sin guardar.
-  Capturas guardadas fuera de Git; revisión visual en escritorio y móvil.
-- `git diff --check`: aprobado.
-
-Para E2E se usó la configuración local de Edge ya instalada y los servidores
-independientes descritos en la entrega HU-02. No se instaló ninguna herramienta.
-No se ejecutaron pruebas de persistencia de abonos, porque el endpoint no existe.
-
-## Revisión manual
-
-Con API, MySQL y frontend iniciados, abrir `http://localhost:5173/#/login`, ingresar
-como ASISTENTE y pulsar **Registrar pagos realizados**. Seleccionar una obligación
-con saldo y probar un monto vacío, cero, negativo, con tres decimales y superior al
-saldo. Elegir un medio y un monto válido para ver el aviso de guardado pendiente.
-
-No se modificaron backend, migraciones, login, módulo del GERENTE, Jira ni AWS.
-No se añadieron dependencias ni se publicaron configuraciones o credenciales.
-Sin commit, push o PR todavía; listo para revisar la interfaz y coordinar el
-contrato pendiente de Haro. No se comenzó HU-04.
+- `npm test`: 72 pruebas aprobadas en 4 archivos; incluye login y regresiones HU-01/HU-02.
+- `npm run lint`: aprobado.
+- `npm run build`: aprobado.
+- Backend: `npm test` aprobó 72 pruebas, incluidas las pruebas reales de idempotencia
+  y concurrencia con MySQL; `npm run check` y `npm run lint` aprobados.
+- `npm run test:e2e`: 7 pruebas aprobadas con Express, frontend y MySQL reales.
+  HU-03 verificó abonos parciales y completos, saldo e historial persistidos.
+- Las pruebas reales usaron una instancia MySQL 8.4 aislada en `127.0.0.1:3307`,
+  con base `sgcp_test`. Los datos están en `.local/mysql-test` y la configuración
+  en `backend/.env.test`; ambos están excluidos de Git y no deben publicarse.
