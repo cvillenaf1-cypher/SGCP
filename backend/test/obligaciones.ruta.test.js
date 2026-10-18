@@ -199,13 +199,6 @@ test('registro: JSON inválido conserva el contrato 400 de la API', async () => 
   assert.equal(obtenerConexion.mock.callCount(), 0)
 })
 
-test('registro: el registro de abonos continúa sin implementarse', async () => {
-  const { aplicacion, ejecutar, obtenerConexion } = await prepararAplicacion()
-  await request(aplicacion).post('/api/obligaciones/81/abonos').auth(token, { type: 'bearer' }).send({ monto: '1.00' }).expect(404)
-  assert.equal(ejecutar.mock.callCount(), 0)
-  assert.equal(obtenerConexion.mock.callCount(), 0)
-})
-
 test('registro: un error SQL devuelve 500 sin exponer consulta ni detalles', async (contexto) => {
   const error = Object.assign(new Error('INSERT INTO obligaciones: detalle privado del proveedor'), { code: 'ER_PRUEBA' })
   const { aplicacion, ejecutar, conexion, obtenerConexion } = await prepararAplicacion({ errorInsercion: error })

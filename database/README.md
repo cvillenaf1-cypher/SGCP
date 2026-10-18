@@ -5,6 +5,9 @@
 MySQL 8.0.16+ con InnoDB y `utf8mb4`. Se verificó la entrega con MySQL 8.0.44.
 
 - `migrations/001_access.sql`: roles, usuarios y sesiones.
+- `migrations/002_obligaciones.sql`: obligaciones y saldo pendiente.
+- `migrations/003_abonos.sql`: pagos realizados, clave idempotente y huella SHA-256
+  de la solicitud.
 - `schema_migrations`: creada por el ejecutor, registra archivo, checksum y fecha UTC.
 
 Desde `backend/`, `npm run db:migrate` aplica únicamente las migraciones pendientes.
@@ -56,5 +59,5 @@ propias filas al terminar. No borran bases ni vacían tablas. Si se interrumpe a
 una prueba pueden quedar usuarios sintéticos; una ejecución posterior no elimina datos
 ajenos para ocultar esa situación.
 
-Las tablas de obligaciones, abonos y comprobantes se crearán en sus entregas. El diseño
-acordado se documenta en [docs/arquitectura.md](../docs/arquitectura.md).
+La tabla de comprobantes corresponde a una historia posterior y no la crea esta
+migración. El diseño acordado se documenta en [docs/arquitectura.md](../docs/arquitectura.md).

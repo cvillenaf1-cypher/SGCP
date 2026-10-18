@@ -11,7 +11,12 @@ function DatosObligacionAbono({ identificador }) {
   const [valores, establecerValores] = useState({ montoAbono: '', medioPago: '' })
   const [errores, establecerErrores] = useState({})
   const [aviso, establecerAviso] = useState('')
+  const [mensajeError, establecerMensajeError] = useState('')
+  const [guardando, establecerGuardando] = useState(false)
+  const [operacionPendiente, establecerOperacionPendiente] = useState(null)
   const formulario = useRef(null)
+  const envioEnCurso = useRef(false)
+  const operacionPendienteRef = useRef(null)
 
   useEffect(() => {
     const controlador = new AbortController()
@@ -24,23 +29,98 @@ function DatosObligacionAbono({ identificador }) {
     return () => controlador.abort()
   }, [identificador, intento, solicitar])
 
-  function comprobarAbono(evento) {
-    evento.preventDefault()
-    establecerAviso('')
-    const nuevosErrores = validarAbono(valores, consulta.obligacion.saldo_pendiente)
-    establecerErrores(nuevosErrores)
-    if (Object.keys(nuevosErrores).length) {
-      formulario.current.elements.namedItem(Object.keys(nuevosErrores)[0])?.focus()
-      return
-    }
-    // El guardado se conectará únicamente cuando Haro publique su contrato real.
-    establecerAviso('Los datos del abono son válidos. El registro está pendiente de la integración del backend de abonos; no se guardó ningún movimiento ni se modificó el saldo.')
+  function actualizarSaldo() {
+    establecerConsulta({ cargando: true, obligacion: null, error: '' })
+    establecerIntento((actual) => actual + 1)
   }
 
-  if (consulta.cargando) return <p role="status">Consultando el saldo actual…</p>
+  async function comprobarAbono(evento) {
+    evento.preventDefault()
+    if (envioEnCurso.current) return
+    establecerAviso('')
+    establecerMensajeError('')
+
+    let operacion = operacionPendienteRef.current
+    if (!operacion) {
+      const nuevosErrores = validarAbono(valores, consulta.obligacion.saldo_pendiente)
+      establecerErrores(nuevosErrores)
+      if (Object.keys(nuevosErrores).length) {
+        formulario.current.elements.namedItem(Object.keys(nuevosErrores)[0])?.focus()
+        return
+      }
+      const claveIdempotencia = globalThis.crypto?.randomUUID?.()
+      if (!claveIdempotencia) {
+        establecerMensajeError('No se pudo generar una clave segura para esta operación. Recarga la página e intenta nuevamente.')
+        return
+      }
+      operacion = {
+        cuerpo: {
+          monto: valores.montoAbono,
+          medio_pago: valores.medioPago,
+          clave_idempotencia: claveIdempotencia,
+        },
+      }
+      operacionPendienteRef.current = operacion
+      establecerOperacionPendiente(operacion)
+    }
+
+    envioEnCurso.current = true
+    establecerGuardando(true)
+    try {
+      const resultado = await solicitar(`/api/obligaciones/${identificador}/abonos`, {
+        method: 'POST',
+        body: operacion.cuerpo,
+      })
+      const saldoResultante = convertirACentimos(resultado?.abono?.saldo_resultante)
+      if (
+        !resultado?.abono
+        || String(resultado.abono.obligacion_id) !== String(identificador)
+        || saldoResultante === null
+        || saldoResultante < 0n
+      ) {
+        throw new Error('El servidor no devolvió una confirmación válida del abono.')
+      }
+      operacionPendienteRef.current = null
+      establecerOperacionPendiente(null)
+      establecerErrores({})
+      establecerAviso(resultado.message || 'Abono registrado correctamente.')
+      actualizarSaldo()
+    } catch (error) {
+      const campos = error?.fields || {}
+      const nuevosErrores = {
+        ...(campos.monto ? { montoAbono: campos.monto } : {}),
+        ...(campos.medio_pago ? { medioPago: campos.medio_pago } : {}),
+        ...(campos.id ? { obligacion: campos.id } : {}),
+      }
+      establecerErrores(nuevosErrores)
+      if (error?.status === 409) {
+        operacionPendienteRef.current = null
+        establecerOperacionPendiente(null)
+        establecerMensajeError(error.message || 'El saldo cambió. Se actualizará antes de registrar otro abono.')
+        actualizarSaldo()
+      } else if (error?.status === 422) {
+        operacionPendienteRef.current = null
+        establecerOperacionPendiente(null)
+        establecerMensajeError(error.message || 'Revisa los datos del abono.')
+      } else {
+        establecerMensajeError(`${error?.message || 'No se pudo confirmar el registro.'} Reintenta para consultar la misma operación sin duplicarla.`)
+      }
+    } finally {
+      envioEnCurso.current = false
+      establecerGuardando(false)
+    }
+  }
+
+  if (consulta.cargando) return <>
+    {aviso && <p className="notice" role="status">{aviso}</p>}
+    {mensajeError && <p className="error-message" role="alert">{mensajeError}</p>}
+    <p role="status">Consultando el saldo actual…</p>
+  </>
   if (consulta.error) return <>
+    {aviso && <p className="notice" role="status">{aviso}</p>}
+    {mensajeError && <p className="error-message" role="alert">{mensajeError}</p>}
     <p className="error-message" role="alert">{consulta.error}</p>
-    <button type="button" onClick={() => { establecerConsulta({ cargando: true, obligacion: null, error: '' }); establecerIntento(intento + 1) }}>Reintentar saldo</button>
+    <button type="button" onClick={actualizarSaldo}>Reintentar saldo</button>
   </>
 
   const obligacion = consulta.obligacion
@@ -54,20 +134,22 @@ function DatosObligacionAbono({ identificador }) {
       <div><dt>Estado económico</dt><dd>{obligacion.estado_economico}</dd></div>
       {obligacion.vencida && <div><dt>Vencimiento</dt><dd>Vencida</dd></div>}
     </dl>
+    {aviso && <p className="notice" role="status">{aviso}</p>}
+    {mensajeError && <p className="error-message" role="alert">{mensajeError}</p>}
     {!tieneSaldo ? <p className="notice" role="alert">Esta obligación ya está pagada. Selecciona otra obligación con saldo disponible.</p> : <form ref={formulario} noValidate onSubmit={comprobarAbono}>
       <div className="abono-campos">
         <div className="field">
           <label htmlFor="monto-abono">Monto del abono (S/)</label>
-          <input id="monto-abono" name="montoAbono" type="text" inputMode="decimal" required
-            value={valores.montoAbono} onChange={(evento) => { establecerValores({ ...valores, montoAbono: evento.target.value }); establecerAviso('') }}
+          <input id="monto-abono" name="montoAbono" type="text" inputMode="decimal" required disabled={guardando || Boolean(operacionPendiente)}
+            value={valores.montoAbono} onChange={(evento) => { establecerValores({ ...valores, montoAbono: evento.target.value }); establecerAviso(''); establecerMensajeError('') }}
             aria-invalid={Boolean(errores.montoAbono)} aria-describedby={`ayuda-monto-abono${errores.montoAbono ? ' error-monto-abono' : ''}`} />
           <small id="ayuda-monto-abono" className="description">Mayor que cero, hasta dos decimales y sin superar el saldo disponible.</small>
           {errores.montoAbono && <p className="field-error" id="error-monto-abono">{errores.montoAbono}</p>}
         </div>
         <div className="field">
           <label htmlFor="medio-abono">Medio de pago</label>
-          <select id="medio-abono" name="medioPago" required value={valores.medioPago}
-            onChange={(evento) => { establecerValores({ ...valores, medioPago: evento.target.value }); establecerAviso('') }}
+          <select id="medio-abono" name="medioPago" required value={valores.medioPago} disabled={guardando || Boolean(operacionPendiente)}
+            onChange={(evento) => { establecerValores({ ...valores, medioPago: evento.target.value }); establecerAviso(''); establecerMensajeError('') }}
             aria-invalid={Boolean(errores.medioPago)} aria-describedby={`ayuda-medio-abono${errores.medioPago ? ' error-medio-abono' : ''}`}>
             <option value="">Selecciona un medio de pago</option>
             {mediosPago.map((medio) => <option key={medio} value={medio}>{medio}</option>)}
@@ -77,9 +159,7 @@ function DatosObligacionAbono({ identificador }) {
         </div>
       </div>
       {errores.obligacion && <p className="error-message" role="alert">{errores.obligacion}</p>}
-      {aviso && <p className="notice" role="status">{aviso}</p>}
-      <button type="submit">Validar abono</button>
-      <p className="description">Por ahora solo puedes validar los datos. El guardado y la actualización del saldo se habilitarán al integrar el backend.</p>
+      <button type="submit" disabled={guardando}>{guardando ? 'Registrando abono…' : operacionPendiente ? 'Reintentar registro' : 'Registrar abono'}</button>
     </form>}
   </>
 }
@@ -110,7 +190,6 @@ export function FormularioAbono() {
   return <section className="registro-abono" aria-labelledby="titulo-registro-abono">
     <h3 id="titulo-registro-abono">Registrar pagos realizados</h3>
     <p className="description">Prepara el registro de un abono realizado fuera del sistema. SGCP no realiza transferencias ni cobros.</p>
-    <p className="notice">Guardado pendiente de integración: las obligaciones y sus saldos se consultan en el servidor; los abonos aún no se pueden guardar.</p>
     {consulta.cargando && <p role="status">Cargando obligaciones…</p>}
     {consulta.error && <><p className="error-message" role="alert">{consulta.error}</p><button type="button" onClick={actualizarObligaciones}>Reintentar obligaciones</button></>}
     {!consulta.cargando && !consulta.error && <>
