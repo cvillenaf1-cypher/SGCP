@@ -58,7 +58,7 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion,
     respuesta.status(201).json({ message: 'Obligación registrada correctamente.', obligacion })
   })
 
-  aplicacion.get('/api/obligaciones', requerirSesion, autorizar(ROLES.ASISTENTE), async (solicitud, respuesta) => {
+  aplicacion.get('/api/obligaciones', requerirSesion, autorizar(ROLES.ASISTENTE, ROLES.GERENTE), async (solicitud, respuesta) => {
     const { filtro, fields: campos } = validarFiltroConsulta(solicitud.query)
     if (Object.keys(campos).length) return respuesta.status(422).json({ message: 'Revisa los datos de la consulta.', fields: campos })
     const obligaciones = await listarObligaciones(conexiones, filtro)

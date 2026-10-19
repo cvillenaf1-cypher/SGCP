@@ -7,7 +7,7 @@ import { ProveedorAutenticacion } from '../auth/AuthProvider'
 import { ContextoAutenticacion } from '../auth/AuthContext'
 import { PaginaPagosDelMes } from '../gerente/PaginaPagosDelMes'
 import { filtrarPagosPorPeriodo, formatearSoles, obtenerPeriodoActual } from '../gerente/pagosDelMes'
-import { consultarPagosDelMes, ErrorIntegracionPendiente } from '../gerente/servicioPagos'
+import { consultarPagosDelMes } from '../gerente/servicioPagos'
 import { pagosDePrueba } from './datos/pagosDelMes'
 
 beforeEach(() => {
@@ -33,7 +33,8 @@ describe('HU-06: consulta mensual de solo lectura', () => {
   it('selecciona el mes y año actuales y consulta mediante el cliente autenticado', async () => {
     const { consultarPagos, solicitar } = renderizarConsulta()
     expect(screen.getByLabelText('Mes')).toHaveValue('10')
-    expect(screen.getByLabelText('Año')).toHaveValue(2026)
+    expect(screen.getByRole('button', { name: '2026' }))
+      .toHaveAttribute('aria-pressed', 'true')
     await screen.findByRole('table')
     expect(consultarPagos).toHaveBeenCalledWith({ mes: 10, anio: 2026, solicitar, senal: expect.any(AbortSignal) })
   })
@@ -80,12 +81,82 @@ describe('HU-06: consulta mensual de solo lectura', () => {
 
   it('permite consultar otro año conservando el mes seleccionado', async () => {
     const { usuario, consultarPagos } = renderizarConsulta()
+
     await screen.findByRole('table')
-    await usuario.clear(screen.getByLabelText('Año'))
-    await usuario.type(screen.getByLabelText('Año'), '2025')
-    expect(await screen.findByText('Renovación de prueba')).toBeInTheDocument()
-    expect(screen.queryByText('Alquiler de prueba')).not.toBeInTheDocument()
-    expect(consultarPagos).toHaveBeenLastCalledWith(expect.objectContaining({ mes: 10, anio: 2025 }))
+
+    await usuario.click(
+      screen.getByRole('button', { name: '2025' })
+    )
+
+    expect(
+      screen.getByRole('button', { name: '2025' })
+    ).toHaveAttribute('aria-pressed', 'true')
+
+    expect(
+      await screen.findByText('Renovación de prueba')
+    ).toBeInTheDocument()
+
+    expect(
+      screen.queryByText('Alquiler de prueba')
+    ).not.toBeInTheDocument()
+
+    expect(consultarPagos).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        mes: 10,
+        anio: 2025,
+      })
+    )
+  })
+
+  it('agrega automáticamente el año 2032 cuando existe una obligación con esa fecha límite', async () => {
+    const pago2032 = {
+      ...pagosDePrueba[0],
+      id: 2032,
+      concepto: 'Obligación de prueba 2032',
+      fechaLimite: '2032-01-20',
+    }
+
+    const consultarPagos = vi.fn().mockResolvedValue([
+      ...pagosDePrueba,
+      pago2032,
+    ])
+
+    const { usuario } = renderizarConsulta(consultarPagos)
+
+    // Esperamos a que SAPO detecte el año de la obligación.
+    const boton2032 = await screen.findByRole('button', {
+      name: '2032',
+    })
+
+    expect(boton2032).toBeInTheDocument()
+
+    // Comprobamos que los años estén ordenados de menor a mayor.
+    const aniosVisibles = screen
+      .getAllByRole('button')
+      .filter((boton) => boton.classList.contains('boton-anio'))
+      .map((boton) => Number(boton.textContent))
+
+    expect(aniosVisibles).toEqual(
+      [...aniosVisibles].sort((a, b) => a - b)
+    )
+
+    // Seleccionamos enero y después el año 2032.
+    await usuario.selectOptions(screen.getByLabelText('Mes'), '1')
+    await usuario.click(boton2032)
+
+    // La obligación debe aparecer en enero de 2032.
+    expect(
+      await screen.findByText('Obligación de prueba 2032')
+    ).toBeInTheDocument()
+
+    expect(boton2032).toHaveAttribute('aria-pressed', 'true')
+
+    expect(consultarPagos).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        mes: 1,
+        anio: 2032,
+      })
+    )
   })
 
   it('informa cuando no hay pagos para el período consultado', async () => {
@@ -100,15 +171,24 @@ describe('HU-06: consulta mensual de solo lectura', () => {
     renderizarConsulta()
     await screen.findByRole('table')
     expect(screen.getByText('Solo lectura')).toBeInTheDocument()
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
-    expect(screen.getAllByRole('spinbutton')).toHaveLength(1)
+    expect(
+      screen.getAllByRole('button').every(
+        (boton) => boton.classList.contains('boton-anio')
+      )
+    ).toBe(true)
+
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
     expect(screen.getAllByRole('combobox')).toHaveLength(1)
+
+    expect(
+      within(screen.getByRole('table')).queryByRole('button')
+    ).not.toBeInTheDocument()
     expect(within(screen.getByRole('table')).queryByRole('textbox')).not.toBeInTheDocument()
   })
 
-  it('distingue la integración pendiente de una consulta real sin resultados', async () => {
-    renderizarConsulta(consultarPagosDelMes)
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('aún no está conectada al servidor'))
+  it('distingue una respuesta inválida de una consulta real sin resultados', async () => {
+    renderizarConsulta((opciones) => consultarPagosDelMes({ ...opciones, solicitar: vi.fn().mockResolvedValue({}) }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('El servidor envió una lista de pagos inválida.')
     expect(screen.queryByText('Sin pagos para este período')).not.toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
@@ -119,15 +199,22 @@ describe('HU-06: consulta mensual de solo lectura', () => {
     expect(screen.queryByText('Sin pagos para este período')).not.toBeInTheDocument()
   })
 
-  it('no consulta mientras el año está vacío o fuera de rango', async () => {
-    const { usuario, consultarPagos } = renderizarConsulta()
+  it('muestra los cinco años habituales sin permitir escribir años arbitrarios', async () => {
+    renderizarConsulta()
+
     await screen.findByRole('table')
-    consultarPagos.mockClear()
-    await usuario.clear(screen.getByLabelText('Año'))
-    expect(screen.getByRole('alert')).toHaveTextContent('Ingresa un año entero entre 1 y 9999.')
-    await usuario.type(screen.getByLabelText('Año'), '0')
-    expect(consultarPagos).not.toHaveBeenCalled()
-    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+
+    for (const anio of [2024, 2025, 2026, 2027, 2028]) {
+      expect(
+        screen.getByRole('button', { name: String(anio) })
+      ).toBeInTheDocument()
+    }
+
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+
+    expect(
+      screen.queryByRole('button', { name: '22222' })
+    ).not.toBeInTheDocument()
   })
 
   it('cancela consultas anteriores y descarta respuestas que llegan fuera de orden', async () => {
@@ -162,10 +249,25 @@ describe('HU-06: consulta mensual de solo lectura', () => {
     expect(filtrarPagosPorPeriodo([pago], 2, 2025)).toEqual([])
   })
 
-  it('el adaptador pendiente nunca consulta una ruta backend inventada', async () => {
-    const solicitar = vi.fn()
-    await expect(consultarPagosDelMes({ mes: 10, anio: 2026, solicitar })).rejects.toBeInstanceOf(ErrorIntegracionPendiente)
-    expect(solicitar).not.toHaveBeenCalled()
+  it('reutiliza el listado real autenticado, sin excluir pagos completos ni filtrar por registro', async () => {
+    const obligaciones = pagosDePrueba.map((pago) => ({
+      id: pago.id, concepto: pago.concepto, beneficiario: pago.beneficiario,
+      monto_original: pago.montoOriginal, saldo_pendiente: pago.saldoPendiente,
+      fecha_limite: pago.fechaLimite, fecha_registro: pago.fechaRegistro,
+      estado_economico: pago.estado.toUpperCase(),
+    }))
+    const solicitar = vi.fn().mockResolvedValue({ obligaciones })
+    const senal = new AbortController().signal
+    const pagos = await consultarPagosDelMes({ mes: 9, anio: 2026, solicitar, senal })
+    expect(solicitar).toHaveBeenCalledExactlyOnceWith('/api/obligaciones', { signal: senal })
+    expect(filtrarPagosPorPeriodo(pagos, 9, 2026)).toEqual([expect.objectContaining({ concepto: 'Compra de prueba', saldoPendiente: '0.00', estado: 'Pagado' })])
+    expect(filtrarPagosPorPeriodo(pagos, 10, 2026)).toHaveLength(2)
+  })
+
+  it('el adaptador conserva los errores de la API y reconoce listas vacías', async () => {
+    const solicitar = vi.fn().mockResolvedValueOnce({ obligaciones: [] }).mockRejectedValueOnce(new Error('Servicio no disponible.'))
+    await expect(consultarPagosDelMes({ solicitar })).resolves.toEqual([])
+    await expect(consultarPagosDelMes({ solicitar })).rejects.toThrow('Servicio no disponible.')
   })
 })
 
@@ -177,11 +279,13 @@ describe('Protección de la ruta mensual con la autenticación existente', () =>
     return render(<MemoryRouter initialEntries={[ruta]}><ProveedorAutenticacion><Aplicacion /><Enlace to={ruta}>Consulta de prueba</Enlace></ProveedorAutenticacion></MemoryRouter>)
   }
 
-  async function iniciarSesion(rol) {
+  async function iniciarSesion(rol, estadoConsulta = 200) {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(respuesta({
       token: 'token-ficticio-de-prueba', expiresAt: new Date(Date.now() + 60000).toISOString(),
       user: { id: 1, name: 'Usuario ficticio', role: rol },
-    })).mockResolvedValue(respuesta({ message: 'Acceso de prueba habilitado.' })))
+    })).mockImplementation((url) => Promise.resolve(url.endsWith('/api/obligaciones')
+      ? respuesta(estadoConsulta === 200 ? { obligaciones: [] } : { message: 'Consulta no disponible.' }, estadoConsulta)
+      : respuesta({ message: 'Acceso de prueba habilitado.' }))))
     renderizarAplicacion()
     const usuario = userEvent.setup()
     await usuario.type(screen.getByLabelText('Correo electrónico'), 'prueba@example.test')
@@ -210,6 +314,25 @@ describe('Protección de la ruta mensual con la autenticación existente', () =>
     await usuario.click(screen.getByRole('link', { name: 'Consultar pagos del mes' }))
     expect(await screen.findByRole('heading', { name: 'Consultar pagos del mes' })).toBeInTheDocument()
     expect(screen.getByLabelText('Mes')).toBeInTheDocument()
-    expect(await screen.findByRole('status')).toHaveTextContent('aún no está conectada al servidor')
+    expect(await screen.findByRole('status')).toHaveTextContent('Sin pagos para este período')
+    const llamada = fetch.mock.calls.find(([url]) => url.endsWith('/api/obligaciones'))
+    expect(llamada[1].headers.Authorization).toBe('Bearer token-ficticio-de-prueba')
+    expect(llamada[1].method).toBe('GET')
+  })
+
+  it('un 401 de la consulta mensual devuelve al gerente al login existente', async () => {
+    const usuario = await iniciarSesion('GERENTE', 401)
+    await screen.findByRole('heading', { name: 'Panel de gerente' })
+    await usuario.click(screen.getByRole('link', { name: 'Consultar pagos del mes' }))
+    expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Tu sesión venció')
+  })
+
+  it('un 403 de la consulta se presenta como error de acceso y no como lista vacía', async () => {
+    const usuario = await iniciarSesion('GERENTE', 403)
+    await screen.findByRole('heading', { name: 'Panel de gerente' })
+    await usuario.click(screen.getByRole('link', { name: 'Consultar pagos del mes' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Consulta no disponible.')
+    expect(screen.queryByText('Sin pagos para este período')).not.toBeInTheDocument()
   })
 })

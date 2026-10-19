@@ -3,8 +3,10 @@ import { formatearFechaLimite, formatearSoles } from './pagosDelMes'
 export function TablaPagosDelMes({ pagos, periodo }) {
   return (
     <div className="contenedor-tabla-pagos" role="region" aria-label="Detalle de pagos del mes" tabIndex={0}>
-      <table className="tabla-pagos">
-        <caption>Pagos con fecha límite en {periodo}</caption>
+      <table
+        className="tabla-pagos"
+        aria-label={`Pagos con fecha límite en ${periodo}`}
+      >
         <thead>
           <tr>
             <th scope="col">Concepto</th>
@@ -18,12 +20,12 @@ export function TablaPagosDelMes({ pagos, periodo }) {
         <tbody>
           {pagos.map((pago) => (
             <tr key={pago.id}>
-              <th scope="row">{pago.concepto}</th>
-              <td>{pago.beneficiario}</td>
-              <td className="monto-pago">{formatearSoles(pago.montoOriginal)}</td>
-              <td className="monto-pago">{formatearSoles(pago.saldoPendiente)}</td>
-              <td className="fecha-pago">{formatearFechaLimite(pago.fechaLimite)}</td>
-              <td><span className="estado-pago">{pago.estado}</span></td>
+              <th scope="row" data-etiqueta="Concepto">{pago.concepto}</th>
+              <td data-etiqueta="Beneficiario">{pago.beneficiario}</td>
+              <td className="monto-pago" data-etiqueta="Monto original">{formatearSoles(pago.montoOriginal)}</td>
+              <td className="monto-pago saldo-pago" data-etiqueta="Saldo pendiente">{formatearSoles(pago.saldoPendiente)}</td>
+              <td className="fecha-pago" data-etiqueta="Fecha límite">{formatearFechaLimite(pago.fechaLimite)}</td>
+              <td data-etiqueta="Estado del pago"><span className="estado-pago" data-estado={pago.estado}>{pago.estado}</span></td>
             </tr>
           ))}
         </tbody>

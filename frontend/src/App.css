@@ -87,9 +87,5 @@ input[aria-invalid='true'] { border-color: #a32323; }
 .empty-state p { margin-bottom: 0; }
 a { color: #234b91; text-underline-offset: 3px; }
 a:focus-visible { outline: 3px solid #809fe0; outline-offset: 3px; }
-.app-footer { margin: 28px 0 0; color: #526176; font-size: 0.85rem; text-align: center; }
-
-.footnote {
-  margin: 32px 0 0;
-  font-size: 0.85rem;
-}
+.app-footer { display: none; margin: 28px 0 0; color: #526176; font-size: 0.85rem; text-align: center;}
+.footnote { margin: 32px 0 0; font-size: 0.85rem;}

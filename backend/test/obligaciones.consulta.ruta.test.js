@@ -198,12 +198,24 @@ test('consulta de obligaciones: ambas rutas devuelven 401 si la sesión no exist
   comprobarSoloLecturas(ejecutar, obtenerConexion)
 })
 
-test('consulta de obligaciones: GERENTE recibe 403 antes de validar listado o detalle', async () => {
+test('HU-06: GERENTE consulta el listado real incluidos pagos parciales y completos, con solo lecturas', async () => {
+  const filas = [filaObligacion, { ...filaObligacion, id: 80, saldo_pendiente: '20.50' }, { ...filaObligacion, id: 79, saldo_pendiente: '0.00' }]
+  const { aplicacion, ejecutar, obtenerConexion } = await prepararAplicacion({ rol: 'GERENTE', filas })
+  const respuesta = await request(aplicacion).get('/api/obligaciones').auth(token, { type: 'bearer' }).expect(200)
+  assert.deepEqual(respuesta.body.obligaciones.map((fila) => fila.estado_economico), ['PENDIENTE', 'PARCIAL', 'PAGADO'])
+  assert.equal(respuesta.body.obligaciones[2].saldo_pendiente, '0.00')
+  assert.equal(respuesta.headers['cache-control'], 'no-store')
+  assert.equal(lecturasObligaciones(ejecutar).length, 1)
+  comprobarSoloLecturas(ejecutar, obtenerConexion)
+})
+
+test('HU-06: GERENTE recibe 422 con filtros inválidos y conserva el bloqueo del detalle y las escrituras', async () => {
   const { aplicacion, ejecutar, obtenerConexion } = await prepararAplicacion({ rol: 'GERENTE' })
-  for (const ruta of ['/api/obligaciones?filtro=invalido', '/api/obligaciones/no-valido']) {
-    await request(aplicacion).get(ruta).auth(token, { type: 'bearer' }).set('X-Role', 'ASISTENTE').expect(403)
-  }
-  assert.equal(ejecutar.mock.callCount(), 2)
+  await request(aplicacion).get('/api/obligaciones?filtro=invalido').auth(token, { type: 'bearer' }).expect(422)
+  await request(aplicacion).get('/api/obligaciones/no-valido').auth(token, { type: 'bearer' }).set('X-Role', 'ASISTENTE').expect(403)
+  await request(aplicacion).post('/api/obligaciones').auth(token, { type: 'bearer' }).send({}).expect(403)
+  await request(aplicacion).post('/api/obligaciones/81/abonos').auth(token, { type: 'bearer' }).send({}).expect(403)
+  assert.equal(ejecutar.mock.callCount(), 4)
   assert.equal(lecturasObligaciones(ejecutar).length, 0)
   comprobarSoloLecturas(ejecutar, obtenerConexion)
 })
