@@ -103,3 +103,20 @@ test('MySQL real: la clave concurrente no puede registrar pagos para dos obligac
   assert.equal(Number(cantidad), 1)
   assert.equal(Number(cambios), 1)
 })
+
+test('MySQL real: saldo cero rechaza nuevos abonos y conserva el reintento del pago total', async () => {
+  const obligacionId = await crearObligacion()
+  const clave = nuevaClave()
+  const primero = await enviarAbono(obligacionId, clave, '10.00').expect(201)
+  assert.equal(primero.body.abono.saldo_resultante, '0.00')
+
+  const rechazado = await enviarAbono(obligacionId, nuevaClave(), '0.01').expect(409)
+  assert.deepEqual(rechazado.body, { message: 'La obligación está pagada o el abono supera su saldo pendiente.' })
+  const reintento = await enviarAbono(obligacionId, clave, '10.00').expect(200)
+  assert.deepEqual(reintento.body, primero.body)
+
+  const [[{ cantidad }]] = await conexiones.execute('SELECT COUNT(*) AS cantidad FROM abonos WHERE obligacion_id = ?', [obligacionId])
+  const [[{ saldo_pendiente: saldo }]] = await conexiones.execute('SELECT saldo_pendiente FROM obligaciones WHERE id = ?', [obligacionId])
+  assert.equal(Number(cantidad), 1)
+  assert.equal(saldo, '0.00')
+})

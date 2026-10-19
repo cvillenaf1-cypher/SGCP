@@ -20,11 +20,11 @@ function prepararPool({ saldo = '0.30', existente = true, anterior, errorInserci
     release: mock.fn(() => {}),
     execute: mock.fn(async (sql, valores) => {
       if (sql.includes('FROM sesiones')) return [[{ session_id: 1, id: 42, nombre: 'Prueba', email: 'prueba@example.test', codigo: rol }]]
-      if (sql.includes('FROM abonos')) return [abono ? [{ ...abono }] : []]
+      if (sql.includes('FROM abonos')) return [abono?.usuario_registrador_id === valores[0] && abono.clave_idempotencia === valores[1] ? [{ ...abono }] : []]
       if (sql.includes('FROM obligaciones')) return [existente ? [{ id: 1, saldo_pendiente: saldo }] : []]
       if (sql.includes('INSERT INTO abonos')) {
         if (errorInsercion) throw errorInsercion
-        abono = { id: 8, obligacion_id: valores[0], monto: valores[1], medio_pago: valores[2], usuario_registrador_id: valores[3], saldo_resultante: valores[5], huella_solicitud: valores[6], fecha_registro: '2026-10-18 12:00:00.123' }
+        abono = { id: 8, obligacion_id: valores[0], monto: valores[1], medio_pago: valores[2], usuario_registrador_id: valores[3], clave_idempotencia: valores[4], saldo_resultante: valores[5], huella_solicitud: valores[6], fecha_registro: '2026-10-18 12:00:00.123' }
         return [{ insertId: 8 }]
       }
       if (sql.includes('UPDATE obligaciones')) {
@@ -130,5 +130,37 @@ test('abonos: ruta exige sesión, ASISTENTE, identificador y cuerpo válido', as
     assert.deepEqual(segundo.body, primero.body)
     await enviar().send({ ...entrada, monto: '0.20' }).expect(409)
     assert.equal(primero.body.abono.usuario_registrador_id, 42)
+  }
+})
+
+test('abonos: petición manual sobre una obligación pagada devuelve 409 sin escrituras', async () => {
+  const doble = prepararPool({ saldo: '0.00' })
+  const aplicacion = await crearAplicacion({ pool: doble.pool, config: configuracion })
+  const respuesta = await request(aplicacion).post('/api/obligaciones/1/abonos')
+    .auth('a'.repeat(64), { type: 'bearer' }).send(entrada).expect(409)
+
+  assert.deepEqual(respuesta.body, { message: 'La obligación está pagada o el abono supera su saldo pendiente.' })
+  assert.equal(doble.saldo(), '0.00')
+  assert.equal(doble.conexion.commit.mock.callCount(), 0)
+  assert.equal(doble.conexion.rollback.mock.callCount(), 1)
+  assert.equal(doble.conexion.release.mock.callCount(), 1)
+  assert.ok(!doble.conexion.execute.mock.calls.some(({ arguments: [sql] }) => /INSERT INTO abonos|UPDATE obligaciones/.test(sql)))
+})
+
+test('abonos: pago total rechaza una nueva clave y conserva el reintento idempotente', async () => {
+  const doble = prepararPool({ saldo: '0.10' })
+  const aplicacion = await crearAplicacion({ pool: doble.pool, config: configuracion })
+  const enviar = (cuerpo) => request(aplicacion).post('/api/obligaciones/1/abonos')
+    .auth('a'.repeat(64), { type: 'bearer' }).send(cuerpo)
+
+  const primero = await enviar(entrada).expect(201)
+  assert.equal(primero.body.abono.saldo_resultante, '0.00')
+  const respuesta = await enviar({ ...entrada, clave_idempotencia: 'operacion-prueba-0002' }).expect(409)
+  assert.deepEqual(respuesta.body, { message: 'La obligación está pagada o el abono supera su saldo pendiente.' })
+  const reintento = await enviar(entrada).expect(200)
+  assert.deepEqual(reintento.body, primero.body)
+  assert.equal(doble.saldo(), '0.00')
+  for (const consulta of ['INSERT INTO abonos', 'UPDATE obligaciones']) {
+    assert.equal(doble.conexion.execute.mock.calls.filter(({ arguments: [sql] }) => sql.includes(consulta)).length, 1)
   }
 })

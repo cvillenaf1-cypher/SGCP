@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAutenticacion } from '../auth/useAuth'
 import { convertirACentimos, mediosPago, validarAbono } from '../lib/validarAbono'
 import { formatearImporte } from '../lib/formatearImporte'
 import { SelectorComprobante } from './SelectorComprobante'
 import './FormularioAbono.css'
 
-function DatosObligacionAbono({ identificador, alBloquear }) {
+function DatosObligacionAbono({ identificador, alBloquear, alActualizarObligacion }) {
   const { solicitar } = useAutenticacion()
   const [consulta, establecerConsulta] = useState({ cargando: true, obligacion: null, error: '' })
   const [intento, establecerIntento] = useState(0)
@@ -36,11 +36,14 @@ function DatosObligacionAbono({ identificador, alBloquear }) {
     solicitar(`/api/obligaciones/${identificador}`, { signal: controlador.signal })
       .then((datos) => {
         if (!datos?.obligacion || convertirACentimos(datos.obligacion.saldo_pendiente) === null || convertirACentimos(datos.obligacion.monto_original) === null) throw new Error('El servidor no devolvió datos válidos de la obligación.')
-        if (!controlador.signal.aborted) establecerConsulta({ cargando: false, obligacion: datos.obligacion, error: '' })
+        if (!controlador.signal.aborted) {
+          establecerConsulta({ cargando: false, obligacion: datos.obligacion, error: '' })
+          alActualizarObligacion(datos.obligacion)
+        }
       })
       .catch((fallo) => { if (!controlador.signal.aborted) establecerConsulta({ cargando: false, obligacion: null, error: fallo.message }) })
     return () => controlador.abort()
-  }, [identificador, intento, solicitar])
+  }, [identificador, intento, solicitar, alActualizarObligacion])
 
   function actualizarSaldo() {
     establecerConsulta({ cargando: true, obligacion: null, error: '' })
@@ -103,6 +106,7 @@ function DatosObligacionAbono({ identificador, alBloquear }) {
       establecerOperacionPendiente(null)
       establecerErrores({})
       establecerAviso(resultado.message || 'Abono registrado correctamente.')
+      alActualizarObligacion({ ...consulta.obligacion, saldo_pendiente: resultado.abono.saldo_resultante })
       actualizarSaldo()
       if (comprobante) {
         const registro = { abonoId: resultado.abono.id, archivo: comprobante, metadatos: null, incierto: false }
@@ -298,6 +302,12 @@ export function FormularioAbono() {
   const [seleccionado, establecerSeleccionado] = useState('')
   const [operacionBloqueada, establecerOperacionBloqueada] = useState(false)
   const [intento, establecerIntento] = useState(0)
+  const actualizarObligacion = useCallback((obligacionActualizada) => {
+    establecerConsulta((actual) => ({
+      ...actual,
+      obligaciones: actual.obligaciones.map((obligacion) => obligacion.id === obligacionActualizada.id ? obligacionActualizada : obligacion),
+    }))
+  }, [])
   useEffect(() => {
     const controlador = new AbortController()
     solicitar('/api/obligaciones', { signal: controlador.signal })
@@ -327,16 +337,16 @@ export function FormularioAbono() {
           <label htmlFor="obligacion-abono">Pago pendiente</label>
           <select id="obligacion-abono" required disabled={operacionBloqueada} value={seleccionado} onChange={(evento) => establecerSeleccionado(evento.target.value)} aria-describedby="ayuda-obligacion-abono">
             <option value="">Selecciona una obligación</option>
-            {consulta.obligaciones.map((obligacion) => <option key={obligacion.id} value={obligacion.id} disabled={!(convertirACentimos(obligacion.saldo_pendiente) > 0n)}>
-              {obligacion.concepto} — {formatearImporte(obligacion.saldo_pendiente)}{convertirACentimos(obligacion.saldo_pendiente) === 0n ? ' — Pagada' : ''}
+            {disponibles.map((obligacion) => <option key={obligacion.id} value={obligacion.id}>
+              {obligacion.concepto} — {formatearImporte(obligacion.saldo_pendiente)}
             </option>)}
           </select>
-          <small id="ayuda-obligacion-abono" className="description">Selecciona una obligación con saldo mayor que cero. Las pagadas no se pueden seleccionar.</small>
+          <small id="ayuda-obligacion-abono" className="description">Selecciona una obligación con saldo mayor que cero.</small>
         </div>
         <button type="button" className="secondary-button" disabled={operacionBloqueada} onClick={actualizarObligaciones}>Actualizar obligaciones</button>
       </div>
       {disponibles.length === 0 && <p className="empty-state" role="status">{consulta.obligaciones.length ? 'Todas las obligaciones están pagadas. No hay saldos disponibles para abonar.' : 'Todavía no hay obligaciones registradas. Registra primero un pago pendiente.'}</p>}
-      {seleccionado && <DatosObligacionAbono key={seleccionado} identificador={seleccionado} alBloquear={establecerOperacionBloqueada} />}
+      {seleccionado && <DatosObligacionAbono key={seleccionado} identificador={seleccionado} alBloquear={establecerOperacionBloqueada} alActualizarObligacion={actualizarObligacion} />}
     </>}
   </section>
 }

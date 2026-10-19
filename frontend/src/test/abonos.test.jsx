@@ -5,13 +5,14 @@ import { FormularioAbono } from '../components/FormularioAbono'
 import { convertirACentimos, mediosPago, validarAbono } from '../lib/validarAbono'
 
 const obligacion = { id: 81, concepto: 'Servicio', beneficiario: 'Proveedor', monto_original: '300.00', saldo_pendiente: '125.50', estado_economico: 'PARCIAL', vencida: true }
+const pendiente = { ...obligacion, id: 83, concepto: 'Préstamo pendiente', saldo_pendiente: '300.00', estado_economico: 'PENDIENTE' }
 const pagada = { ...obligacion, id: 82, concepto: 'Alquiler pagado', saldo_pendiente: '0.00', estado_economico: 'PAGADO', vencida: false }
 const valores = { montoAbono: '100.50', medioPago: 'Efectivo' }
 
 beforeEach(() => vi.stubGlobal('crypto', { randomUUID: vi.fn().mockReturnValue('123e4567-e89b-12d3-a456-426614174000') }))
 afterEach(() => vi.unstubAllGlobals())
 
-function prepararFormulario(solicitar = vi.fn().mockImplementation((ruta) => Promise.resolve(ruta === '/api/obligaciones' ? { obligaciones: [obligacion, pagada] } : { obligacion }))) {
+function prepararFormulario(solicitar = vi.fn().mockImplementation((ruta) => Promise.resolve(ruta === '/api/obligaciones' ? { obligaciones: [pendiente, obligacion, pagada] } : { obligacion }))) {
   render(<ContextoAutenticacion.Provider value={{ solicitar }}><FormularioAbono /></ContextoAutenticacion.Provider>)
   return solicitar
 }
@@ -53,10 +54,14 @@ describe('Validación de abonos — HU-03', () => {
 })
 
 describe('Formulario de registro de pagos realizados', () => {
-  it('consulta obligaciones reales y deshabilita las pagadas', async () => {
+  it('consulta obligaciones reales y excluye las pagadas del selector', async () => {
     const solicitar = prepararFormulario()
     expect(screen.getByText('Cargando obligaciones…')).toBeInTheDocument()
-    expect(await screen.findByRole('option', { name: /Alquiler pagado/ })).toBeDisabled()
+    expect(await screen.findByRole('option', { name: /Préstamo pendiente/ })).toBeEnabled()
+    expect(screen.getByRole('option', { name: /Servicio/ })).toBeEnabled()
+    expect(screen.queryByRole('option', { name: /Alquiler pagado/ })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(3)
+    expect(solicitar.mock.calls[0][0]).toBe('/api/obligaciones')
     expect(screen.queryByLabelText('Monto del abono (S/)')).not.toBeInTheDocument()
     await seleccionarObligacion()
     expect(solicitar.mock.calls.at(-1)[0]).toBe('/api/obligaciones/81')
@@ -64,6 +69,20 @@ describe('Formulario de registro de pagos realizados', () => {
     expect(screen.getByText('S/ 125.50')).toBeInTheDocument()
     expect(screen.getByText('PARCIAL')).toBeInTheDocument()
     expect(screen.queryByLabelText(/fecha del abono|saldo final/i)).not.toBeInTheDocument()
+  })
+
+  for (const saldo of ['0', '0.0', '0.00']) {
+    it(`excluye saldo ${saldo} aunque el estado económico sea PENDIENTE`, async () => {
+      prepararFormulario(vi.fn().mockResolvedValue({ obligaciones: [{ ...pendiente, saldo_pendiente: saldo }] }))
+      await screen.findByLabelText('Pago pendiente')
+      expect(screen.getAllByRole('option')).toHaveLength(1)
+      expect(screen.queryByRole('option', { name: /Préstamo pendiente/ })).not.toBeInTheDocument()
+    })
+  }
+
+  it('permite seleccionar un saldo decimal de un céntimo', async () => {
+    prepararFormulario(vi.fn().mockResolvedValue({ obligaciones: [{ ...obligacion, saldo_pendiente: '0.01' }] }))
+    expect(await screen.findByRole('option', { name: 'Servicio — S/ 0.01' })).toBeEnabled()
   })
 
   it('muestra errores específicos de monto y medio con foco accesible', async () => {
@@ -121,9 +140,25 @@ describe('Formulario de registro de pagos realizados', () => {
     fireEvent.change(screen.getByLabelText('Medio de pago'), { target: { value: 'Tarjeta' } })
     fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
     expect(await screen.findByText('Esta obligación ya está pagada. Selecciona otra obligación con saldo disponible.')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Abono registrado correctamente.')
+    expect(screen.getByText('Abono registrado correctamente.')).toBeInTheDocument()
     expect(screen.getByText('PAGADO')).toBeInTheDocument()
     expect(screen.getByText('S/ 0.00')).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Servicio/ })).not.toBeInTheDocument()
+  })
+
+  it('retira la obligación al confirmar el pago total aunque falle la consulta posterior del saldo', async () => {
+    prepararFormulario(vi.fn()
+      .mockResolvedValueOnce({ obligaciones: [obligacion] })
+      .mockResolvedValueOnce({ obligacion })
+      .mockResolvedValueOnce({ message: 'Abono registrado correctamente.', abono: { obligacion_id: 81, saldo_resultante: '0.00' } })
+      .mockRejectedValueOnce(new Error('Sin conexión al consultar saldo.')))
+    await seleccionarObligacion()
+    fireEvent.change(screen.getByLabelText('Monto del abono (S/)'), { target: { value: '125.50' } })
+    fireEvent.change(screen.getByLabelText('Medio de pago'), { target: { value: 'Efectivo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
+    expect(await screen.findByRole('button', { name: 'Reintentar saldo' })).toBeInTheDocument()
+    expect(screen.getByText('Abono registrado correctamente.')).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Servicio/ })).not.toBeInTheDocument()
   })
 
   it('bloquea envíos simultáneos y doble clic mientras guarda', async () => {
@@ -211,6 +246,7 @@ describe('Formulario de registro de pagos realizados', () => {
     fireEvent.change(screen.getByLabelText('Pago pendiente'), { target: { value: '81' } })
     expect(await screen.findByRole('alert')).toHaveTextContent('Esta obligación ya está pagada.')
     expect(screen.queryByRole('button', { name: 'Registrar abono' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Servicio/ })).not.toBeInTheDocument()
   })
 
   it('distingue un negocio vacío de uno con todas sus obligaciones pagadas', async () => {
