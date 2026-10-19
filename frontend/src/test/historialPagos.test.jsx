@@ -1,11 +1,12 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HistorialPagos } from '../components/HistorialPagos'
 import { ContextoAutenticacion } from '../auth/AuthContext'
 
-const obligacion = { id: 81, concepto: 'Limpieza', monto_original: '300.00', saldo_pendiente: '125.50', estado_economico: 'PARCIAL' }
-const pagada = { ...obligacion, id: 82, concepto: 'Alquiler pagado', saldo_pendiente: '0.00', estado_economico: 'PAGADO' }
-const pendiente = { ...obligacion, id: 83, concepto: 'Mantenimiento', saldo_pendiente: '300.00', estado_economico: 'PENDIENTE' }
+const obligacion = { id: 81, concepto: 'Limpieza', beneficiario: 'Servicios Pérez', monto_original: '300.00', saldo_pendiente: '125.50', estado_economico: 'PARCIAL' }
+const pagada = { ...obligacion, id: 82, concepto: 'Alquiler pagado', beneficiario: 'María Núñez', saldo_pendiente: '0.00', estado_economico: 'PAGADO' }
+const pendiente = { ...obligacion, id: 83, concepto: 'Mantenimiento', beneficiario: 'Taller López', saldo_pendiente: '300.00', estado_economico: 'PENDIENTE' }
 const abonos = [
   { id: 7, monto: '100.00', medio_pago: 'Efectivo', fecha_registro: '2026-10-17T15:00:00.000Z', tiene_comprobante: false, puede_descargar_comprobante: false, url_comprobante: null },
   { id: 8, monto: '49.00', medio_pago: 'Transferencia', fecha_registro: '2026-10-18T16:00:00.000Z', tiene_comprobante: false, puede_descargar_comprobante: false, url_comprobante: null },
@@ -35,8 +36,17 @@ function prepararHistorial(solicitar = vi.fn().mockImplementation((ruta) => Prom
 }
 
 async function seleccionarObligacion(id = 81) {
-  await screen.findByRole('option', { name: 'Limpieza — PARCIAL' })
-  fireEvent.change(screen.getByLabelText('Obligación a consultar'), { target: { value: String(id) } })
+  const seleccionada = [obligacion, pagada, pendiente].find((registro) => registro.id === id)
+  fireEvent.click(await screen.findByRole('button', { name: `Ver historial de ${seleccionada.concepto} (#${id})` }))
+}
+
+function detalleHistorial() {
+  return within(screen.getByRole('region', { name: 'Historial de la obligación' }))
+}
+
+function botonesDeObligaciones() {
+  return within(screen.getByRole('table', { name: 'Obligaciones para consultar historial' }))
+    .queryAllByRole('button', { name: /^Ver historial de / })
 }
 
 function comprobarSoloLectura(solicitar) {
@@ -53,6 +63,105 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Consultar historial real de pagos — HU-05', () => {
+  it('muestra todas las obligaciones en una tabla, incluidas las pagadas, sin elegir ni consultar una automáticamente', async () => {
+    const registros = [obligacion, pagada, pendiente]
+    const antes = structuredClone(registros)
+    const solicitar = vi.fn().mockResolvedValue({ obligaciones: registros })
+    prepararHistorial(solicitar)
+    const tabla = await screen.findByRole('table', { name: 'Obligaciones para consultar historial' })
+    expect(within(tabla).getAllByRole('columnheader').map((celda) => celda.textContent))
+      .toEqual(['Concepto', 'Beneficiario', 'Monto original', 'Saldo pendiente', 'Estado', 'Acción'])
+    expect(botonesDeObligaciones()).toHaveLength(3)
+    for (const registro of registros) {
+      const boton = within(tabla).getByRole('button', { name: `Ver historial de ${registro.concepto} (#${registro.id})` })
+      const fila = within(boton.closest('tr'))
+      expect(fila.getByText(registro.concepto)).toBeInTheDocument()
+      expect(fila.getByText(registro.beneficiario)).toBeInTheDocument()
+      expect(fila.getByText(`#${registro.id}`)).toBeInTheDocument()
+      expect(boton).toHaveAttribute('aria-pressed', 'false')
+    }
+    expect(within(tabla).getByText('S/ 125.50')).toBeInTheDocument()
+    expect(within(tabla).getByText('S/ 0.00')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Obligación a consultar' })).not.toBeInTheDocument()
+    expect(screen.getByRole('searchbox', { name: 'Buscar obligaciones' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Historial de la obligación' })).not.toBeInTheDocument()
+    expect(solicitar.mock.calls.map(([ruta]) => ruta)).toEqual(['/api/obligaciones'])
+    expect(registros).toEqual(antes)
+    comprobarSoloLectura(solicitar)
+  })
+
+  it.each([
+    ['limPIEZA', 'Ver historial de Limpieza (#81)'],
+    ['SERVICIOS perez', 'Ver historial de Limpieza (#81)'],
+    ['  MARIA    nunez  ', 'Ver historial de Alquiler pagado (#82)'],
+    ['parcial', 'Ver historial de Limpieza (#81)'],
+    ['82', 'Ver historial de Alquiler pagado (#82)'],
+    ['pendiente taller', 'Ver historial de Mantenimiento (#83)'],
+  ])('filtra localmente por concepto, beneficiario, estado o ID con la búsqueda «%s»', async (busqueda, nombre) => {
+    const { solicitar } = prepararHistorial()
+    const campo = await screen.findByRole('searchbox', { name: 'Buscar obligaciones' })
+    fireEvent.change(campo, { target: { value: busqueda } })
+    expect(botonesDeObligaciones().map((boton) => boton.getAttribute('aria-label'))).toEqual([nombre])
+    expect(screen.queryByRole('region', { name: 'Historial de la obligación' })).not.toBeInTheDocument()
+    expect(solicitar.mock.calls.map(([ruta]) => ruta)).toEqual(['/api/obligaciones'])
+    comprobarSoloLectura(solicitar)
+  })
+
+  it('exige que coincidan todas las palabras, distingue no encontrar resultados y permite volver a mostrar todas', async () => {
+    const { solicitar } = prepararHistorial()
+    const campo = await screen.findByRole('searchbox', { name: 'Buscar obligaciones' })
+    fireEvent.change(campo, { target: { value: 'Limpieza Núñez' } })
+    expect(screen.getByText('No hay obligaciones que coincidan con la búsqueda.')).toBeInTheDocument()
+    expect(screen.queryAllByRole('button', { name: /^Ver historial de / })).toHaveLength(0)
+    expect(screen.queryByText('Todavía no hay obligaciones registradas para consultar.')).not.toBeInTheDocument()
+    fireEvent.change(campo, { target: { value: '' } })
+    expect(botonesDeObligaciones()).toHaveLength(3)
+    expect(screen.getByRole('button', { name: 'Ver historial de Alquiler pagado (#82)' })).not.toBeDisabled()
+    expect(screen.queryByText('No hay obligaciones que coincidan con la búsqueda.')).not.toBeInTheDocument()
+    expect(solicitar).toHaveBeenCalledTimes(1)
+  })
+
+  it('permite seleccionar una fila y muestra su historial debajo de la tabla', async () => {
+    const { solicitar } = prepararHistorial()
+    const tabla = await screen.findByRole('table', { name: 'Obligaciones para consultar historial' })
+    fireEvent.click(within(tabla).getByText(obligacion.beneficiario))
+    const lista = await screen.findByRole('list', { name: 'Historial de abonos' })
+    expect(screen.getByRole('button', { name: 'Ver historial de Limpieza (#81)' })).toHaveAttribute('aria-pressed', 'true')
+    expect(tabla.compareDocumentPosition(lista) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(solicitar.mock.calls.map(([ruta]) => ruta)).toEqual(['/api/obligaciones', '/api/obligaciones/81/historial'])
+  })
+
+  it.each(['{Enter}', ' '])('permite seleccionar una obligación por teclado con %s', async (tecla) => {
+    const usuario = userEvent.setup()
+    const { solicitar } = prepararHistorial()
+    const boton = await screen.findByRole('button', { name: 'Ver historial de Limpieza (#81)' })
+    boton.focus()
+    expect(boton).toHaveFocus()
+    await usuario.keyboard(tecla)
+    expect(await screen.findByRole('list', { name: 'Historial de abonos' })).toBeInTheDocument()
+    expect(boton).toHaveAttribute('aria-pressed', 'true')
+    expect(solicitar).toHaveBeenCalledTimes(2)
+  })
+
+  it('conserva el historial seleccionado aunque la búsqueda oculte su fila, sin volver a consultarlo', async () => {
+    const { solicitar } = prepararHistorial()
+    await seleccionarObligacion()
+    const lista = await screen.findByRole('list', { name: 'Historial de abonos' })
+    const detalle = screen.getByRole('region', { name: 'Historial de la obligación' })
+    const campo = screen.getByRole('searchbox', { name: 'Buscar obligaciones' })
+    fireEvent.change(campo, { target: { value: 'Alquiler' } })
+    expect(screen.queryByRole('button', { name: 'Ver historial de Limpieza (#81)' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Historial de la obligación' })).toBe(detalle)
+    expect(screen.getByRole('list', { name: 'Historial de abonos' })).toBe(lista)
+    fireEvent.change(campo, { target: { value: 'inexistente' } })
+    expect(screen.getByText('No hay obligaciones que coincidan con la búsqueda.')).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Historial de abonos' })).toBe(lista)
+    fireEvent.change(campo, { target: { value: '' } })
+    expect(screen.getByRole('button', { name: 'Ver historial de Limpieza (#81)' })).toHaveAttribute('aria-pressed', 'true')
+    expect(solicitar).toHaveBeenCalledTimes(2)
+    comprobarSoloLectura(solicitar)
+  })
+
   it('consulta la API real, muestra el resumen y los pagos en orden descendente sin modificar la respuesta', async () => {
     const historial = datosHistorial()
     const antes = structuredClone(historial)
@@ -61,9 +170,9 @@ describe('Consultar historial real de pagos — HU-05', () => {
     expect(screen.getByText('Cargando obligaciones…')).toBeInTheDocument()
     await seleccionarObligacion()
     const lista = await screen.findByRole('list', { name: 'Historial de abonos' })
-    expect(screen.getByText('S/ 300.00')).toBeInTheDocument()
-    expect(screen.getByText('S/ 174.50')).toBeInTheDocument()
-    expect(screen.getByText('S/ 125.50')).toBeInTheDocument()
+    expect(detalleHistorial().getByText('S/ 300.00')).toBeInTheDocument()
+    expect(detalleHistorial().getByText('S/ 174.50')).toBeInTheDocument()
+    expect(detalleHistorial().getByText('S/ 125.50')).toBeInTheDocument()
     const movimientos = within(lista).getAllByRole('listitem')
     expect(movimientos).toHaveLength(3)
     for (const [indice, abono] of [abonos[2], abonos[1], abonos[0]].entries()) {
@@ -83,9 +192,9 @@ describe('Consultar historial real de pagos — HU-05', () => {
     const historial = datosHistorial(pagada, { total_abonado: '300.00', abonos: [{ ...abonos[0], monto: '300.00' }] })
     const solicitar = vi.fn().mockResolvedValueOnce({ obligaciones: [obligacion, pagada] }).mockResolvedValue({ historial })
     prepararHistorial(solicitar)
-    expect(await screen.findByRole('option', { name: 'Alquiler pagado — PAGADO' })).not.toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Ver historial de Alquiler pagado (#82)' })).not.toBeDisabled()
     await seleccionarObligacion(82)
-    expect(await screen.findByText('S/ 0.00')).toBeInTheDocument()
+    expect(await detalleHistorial().findByText('S/ 0.00')).toBeInTheDocument()
     expect(within(screen.getByRole('list', { name: 'Historial de abonos' })).getByText('S/ 300.00')).toBeInTheDocument()
     expect(solicitar.mock.calls.at(-1)[0]).toBe('/api/obligaciones/82/historial')
     comprobarSoloLectura(solicitar)
@@ -96,8 +205,8 @@ describe('Consultar historial real de pagos — HU-05', () => {
       .mockResolvedValue({ historial: datosHistorial(pendiente, { total_abonado: '0.00', abonos: [] }) }))
     await seleccionarObligacion(83)
     expect(await screen.findByText('Esta obligación todavía no tiene abonos.')).toBeInTheDocument()
-    expect(screen.getByText('S/ 0.00')).toBeInTheDocument()
-    expect(screen.getAllByText('S/ 300.00')).toHaveLength(2)
+    expect(detalleHistorial().getByText('S/ 0.00')).toBeInTheDocument()
+    expect(detalleHistorial().getAllByText('S/ 300.00')).toHaveLength(2)
     expect(screen.queryByRole('list', { name: 'Historial de abonos' })).not.toBeInTheDocument()
   })
 
@@ -127,7 +236,7 @@ describe('Consultar historial real de pagos — HU-05', () => {
     await screen.findByRole('list', { name: 'Historial de abonos' })
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar historial' }))
     expect(await screen.findByText('S/ 199.50')).toBeInTheDocument()
-    expect(screen.getByLabelText('Obligación a consultar')).toHaveValue('81')
+    expect(screen.getByRole('button', { name: 'Ver historial de Limpieza (#81)' })).toHaveAttribute('aria-pressed', 'true')
     const movimientos = within(screen.getByRole('list', { name: 'Historial de abonos' })).getAllByRole('listitem')
     expect(movimientos).toHaveLength(4)
     expect(within(movimientos[0]).getByText('S/ 25.00')).toBeInTheDocument()
@@ -146,7 +255,7 @@ describe('Consultar historial real de pagos — HU-05', () => {
     prepararHistorial(vi.fn().mockRejectedValueOnce(new Error('Sin conexión.')).mockResolvedValue({ obligaciones: [obligacion] }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Sin conexión.')
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar obligaciones' }))
-    expect(await screen.findByRole('option', { name: 'Limpieza — PARCIAL' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Ver historial de Limpieza (#81)' })).toBeInTheDocument()
   })
 
   it('permite reintentar un error del historial sin confundirlo con ausencia de pagos', async () => {
@@ -167,12 +276,12 @@ describe('Consultar historial real de pagos — HU-05', () => {
     prepararHistorial(solicitar)
     await seleccionarObligacion()
     const señalAnterior = solicitar.mock.calls[1][1].signal
-    fireEvent.change(screen.getByLabelText('Obligación a consultar'), { target: { value: '82' } })
-    await screen.findByText('S/ 0.00')
+    await seleccionarObligacion(82)
+    await detalleHistorial().findByText('S/ 0.00')
     await act(async () => { resolverAnterior({ historial: datosHistorial() }) })
     expect(señalAnterior.aborted).toBe(true)
-    expect(screen.getByLabelText('Obligación a consultar')).toHaveValue('82')
-    expect(screen.queryByText('S/ 125.50')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ver historial de Alquiler pagado (#82)' })).toHaveAttribute('aria-pressed', 'true')
+    expect(detalleHistorial().queryByText('S/ 125.50')).not.toBeInTheDocument()
     expect(within(screen.getByRole('list', { name: 'Historial de abonos' })).getByText('S/ 300.00')).toBeInTheDocument()
   })
 
@@ -224,8 +333,8 @@ describe('Consultar historial real de pagos — HU-05', () => {
     await seleccionarObligacion()
     fireEvent.click(await screen.findByRole('button', { name: 'Ver comprobante' }))
     await screen.findByRole('img', { name: 'Comprobante del abono #9' })
-    fireEvent.change(screen.getByLabelText('Obligación a consultar'), { target: { value: '82' } })
-    await screen.findByText('S/ 0.00')
+    await seleccionarObligacion(82)
+    await detalleHistorial().findByText('S/ 0.00')
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:comprobante-de-prueba')
   })
@@ -240,8 +349,8 @@ describe('Consultar historial real de pagos — HU-05', () => {
     await seleccionarObligacion()
     fireEvent.click(await screen.findByRole('button', { name: 'Ver comprobante' }))
     const señalComprobante = solicitar.mock.calls[2][1].signal
-    fireEvent.change(screen.getByLabelText('Obligación a consultar'), { target: { value: '82' } })
-    await screen.findByText('S/ 0.00')
+    await seleccionarObligacion(82)
+    await detalleHistorial().findByText('S/ 0.00')
     await act(async () => { resolverComprobante(new Blob(['imagen'], { type: 'image/png' })) })
     expect(señalComprobante.aborted).toBe(true)
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
@@ -260,10 +369,26 @@ describe('Consultar historial real de pagos — HU-05', () => {
 
   it('actualiza el catálogo de obligaciones mediante consultas de solo lectura', async () => {
     const { solicitar } = prepararHistorial()
-    await screen.findByRole('option', { name: 'Limpieza — PARCIAL' })
+    await screen.findByRole('button', { name: 'Ver historial de Limpieza (#81)' })
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar obligaciones' }))
     await waitFor(() => expect(solicitar).toHaveBeenCalledTimes(2))
     expect(solicitar.mock.calls.map(([ruta]) => ruta)).toEqual(['/api/obligaciones', '/api/obligaciones'])
+    comprobarSoloLectura(solicitar)
+  })
+
+  it('conserva la búsqueda al actualizar obligaciones y limpia la selección anterior', async () => {
+    const { solicitar } = prepararHistorial()
+    const campo = await screen.findByRole('searchbox', { name: 'Buscar obligaciones' })
+    fireEvent.change(campo, { target: { value: 'perez' } })
+    await seleccionarObligacion()
+    await screen.findByRole('list', { name: 'Historial de abonos' })
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar obligaciones' }))
+    const campoActualizado = await screen.findByRole('searchbox', { name: 'Buscar obligaciones' })
+    expect(campoActualizado).toHaveValue('perez')
+    expect(botonesDeObligaciones()).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Ver historial de Limpieza (#81)' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('region', { name: 'Historial de la obligación' })).not.toBeInTheDocument()
+    expect(solicitar.mock.calls.map(([ruta]) => ruta)).toEqual(['/api/obligaciones', '/api/obligaciones/81/historial', '/api/obligaciones'])
     comprobarSoloLectura(solicitar)
   })
 })

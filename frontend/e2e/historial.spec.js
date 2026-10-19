@@ -79,7 +79,12 @@ async function simularApi(pagina, escenario) {
 
 async function abrirHistorial(pagina, id = '7') {
   await pagina.getByRole('button', { name: 'Consultar historial de pagos', exact: true }).click()
-  await pagina.getByLabel('Obligación a consultar', { exact: true }).selectOption(id)
+  await seleccionarObligacion(pagina, id)
+}
+
+async function seleccionarObligacion(pagina, id) {
+  await pagina.getByRole('table', { name: 'Obligaciones para consultar historial' })
+    .getByRole('button', { name: new RegExp(`\\(#${id}\\)$`) }).click()
 }
 
 function resumen(pagina, etiqueta) {
@@ -108,7 +113,7 @@ test('historial real del cliente HTTP: resumen, orden, pagadas y comprobante aut
   await expect.poll(() => imagen.evaluate((elemento) => elemento.complete && elemento.naturalWidth > 0)).toBe(true)
   await pagina.getByRole('button', { name: 'Cerrar comprobante' }).click()
   await expect(imagen).toHaveCount(0)
-  await pagina.getByLabel('Obligación a consultar', { exact: true }).selectOption('8')
+  await seleccionarObligacion(pagina, '8')
   await expect(resumen(pagina, 'Monto original')).toHaveText('S/ 200.00')
   await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 200.00')
   await expect(resumen(pagina, 'Saldo pendiente actual')).toHaveText('S/ 0.00')
@@ -154,11 +159,73 @@ test('historial vacío y errores recuperables no crean ni modifican pagos', asyn
   await expect(resumen(pagina, 'Monto original')).toHaveText('S/ 500.00')
   await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 0.00')
   await expect(resumen(pagina, 'Saldo pendiente actual')).toHaveText('S/ 500.00')
-  await pagina.getByLabel('Obligación a consultar', { exact: true }).selectOption('7')
+  await seleccionarObligacion(pagina, '7')
   await pagina.getByRole('button', { name: 'Ver comprobante', exact: true }).click()
   await expect(pagina.getByRole('alert')).toHaveText('No se pudo consultar el comprobante.')
   escenario.fallarComprobante = false
   await pagina.getByRole('button', { name: 'Reintentar comprobante', exact: true }).click()
   await expect(pagina.getByRole('img', { name: 'Comprobante del abono #11' })).toBeVisible()
   expect(escenario.solicitudes.filter(({ metodo, camino }) => metodo !== 'GET' && camino !== '/api/auth/login')).toEqual([])
+})
+
+test('la tabla permite buscar todas las obligaciones y conserva el detalle al cambiar la búsqueda', async ({ page: pagina }) => {
+  const escenario = crearEscenario()
+  await simularApi(pagina, escenario)
+  await pagina.getByRole('button', { name: 'Consultar historial de pagos', exact: true }).click()
+  const tabla = pagina.getByRole('table', { name: 'Obligaciones para consultar historial' })
+  const botones = tabla.getByRole('button', { name: /^Ver historial de / })
+  const busqueda = pagina.getByLabel('Buscar obligaciones', { exact: true })
+  await expect(botones).toHaveCount(3)
+  await expect(tabla.getByRole('row').filter({ hasText: 'Préstamo cancelado' })).toContainText('Pagado')
+  await expect(pagina.getByRole('list', { name: 'Historial de abonos' })).toHaveCount(0)
+
+  await busqueda.fill('PRESTAMO prueba PAGADO 8')
+  await expect(botones).toHaveCount(1)
+  const pagada = tabla.getByRole('button', { name: 'Ver historial de Préstamo cancelado (#8)', exact: true })
+  await pagada.focus()
+  await pagina.keyboard.press('Enter')
+  await expect(pagada).toHaveAttribute('aria-pressed', 'true')
+  await expect(resumen(pagina, 'Concepto de la obligación')).toHaveText('Préstamo cancelado')
+  await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 200.00')
+
+  const consultasAntesDeFiltrar = escenario.solicitudes.filter(({ camino }) => camino === '/api/obligaciones/8/historial').length
+  await busqueda.fill('proveedor parcial')
+  await expect(botones).toHaveCount(1)
+  await expect(botones).toHaveAccessibleName('Ver historial de Proveedor con abonos (#7)')
+  await expect(resumen(pagina, 'Concepto de la obligación')).toHaveText('Préstamo cancelado')
+  await busqueda.fill('sin coincidencias')
+  await expect(botones).toHaveCount(0)
+  await expect(pagina.getByText('No hay obligaciones que coincidan con la búsqueda.', { exact: true })).toBeVisible()
+  await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 200.00')
+  await pagina.getByRole('button', { name: 'Limpiar búsqueda', exact: true }).click()
+  await expect(busqueda).toHaveValue('')
+  await expect(botones).toHaveCount(3)
+  await expect(pagada).toHaveAttribute('aria-pressed', 'true')
+  expect(escenario.solicitudes.filter(({ camino }) => camino === '/api/obligaciones/8/historial')).toHaveLength(consultasAntesDeFiltrar)
+
+  await tabla.getByRole('row').filter({ hasText: 'Proveedor con abonos' }).getByRole('cell').first().click()
+  await expect(tabla.getByRole('button', { name: 'Ver historial de Proveedor con abonos (#7)', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(resumen(pagina, 'Concepto de la obligación')).toHaveText('Proveedor con abonos')
+  await expect(pagina.getByRole('list', { name: 'Historial de abonos' }).getByRole('listitem')).toHaveCount(2)
+  expect(escenario.solicitudes.filter(({ metodo, camino }) => metodo !== 'GET' && camino !== '/api/auth/login')).toEqual([])
+})
+
+test('en móvil la tabla se desplaza dentro de su contenedor sin desbordar la página', async ({ page: pagina }) => {
+  await pagina.setViewportSize({ width: 390, height: 844 })
+  const escenario = crearEscenario()
+  await simularApi(pagina, escenario)
+  await abrirHistorial(pagina)
+  const tabla = pagina.getByRole('table', { name: 'Obligaciones para consultar historial' })
+  await expect(tabla).toBeVisible()
+  expect(await pagina.getByRole('region', { name: 'Tabla de obligaciones', exact: true }).evaluate((elemento) => elemento.scrollWidth > elemento.clientWidth)).toBe(true)
+  await expect(pagina.getByRole('list', { name: 'Historial de abonos' }).getByRole('listitem')).toHaveCount(2)
+  expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+  const busqueda = pagina.getByLabel('Buscar obligaciones', { exact: true })
+  await busqueda.fill('PRESTAMO')
+  const pagada = tabla.getByRole('button', { name: 'Ver historial de Préstamo cancelado (#8)', exact: true })
+  await pagada.focus()
+  await pagina.keyboard.press('Space')
+  await expect(pagada).toHaveAttribute('aria-pressed', 'true')
+  await expect(resumen(pagina, 'Saldo pendiente actual')).toHaveText('S/ 0.00')
+  expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
 })

@@ -6,6 +6,14 @@ La pantalla del ASISTENTE consulta los pagos reales de la obligación selecciona
 incluidas las pagadas. Se retiraron el ejemplo visual y los avisos de integración
 pendiente. El listado conserva la consulta general de obligaciones existente.
 
+Las obligaciones se muestran en una tabla con concepto, número, beneficiario,
+monto original, saldo y estado. El buscador superior filtra por concepto,
+beneficiario, número o estado, sin distinguir mayúsculas ni tildes. Admite varias
+palabras y no realiza solicitudes adicionales. Una búsqueda vacía muestra todas.
+Al pulsar una fila o su botón Ver historial, los pagos se muestran debajo y la
+fila queda marcada como seleccionada. Filtrar no cierra el historial consultado.
+La tabla tiene desplazamiento interno y encabezados fijos para listados largos.
+
 Lecturas utilizadas con la sesión vigente:
 
 - `GET /api/obligaciones`: obligaciones disponibles para consultar.
@@ -16,7 +24,7 @@ Lecturas utilizadas con la sesión vigente:
 
 | Criterio | Comportamiento implementado |
 | --- | --- |
-| Consultar un compromiso registrado | Selector de obligaciones reales, incluidas las pagadas. |
+| Consultar un compromiso registrado | Tabla buscable de obligaciones reales, incluidas las pagadas; selección de fila y detalle debajo. |
 | Fecha, monto y medio de pago | Cada fila muestra los tres datos del abono real. |
 | Más recientes primero | Orden descendente por fecha de registro y, en empates, por ID. |
 | Monto original | Se incluye en el resumen de la obligación. |
@@ -39,7 +47,7 @@ pendientes y libera las URLs temporales de las imágenes.
 
 ## Verificación
 
-Pruebas de componentes: historial, errores, actualización, importes exactos,
+Pruebas de componentes: tabla, búsqueda local, selección por teclado, historial, errores, actualización, importes exactos,
 obligaciones pagadas, respuestas obsoletas, comprobantes y sesión vencida.
 Pruebas de backend: resumen, orden, céntimos exactos, inconsistencias, solo lectura
 y registro de otro abono sin alterar pagos anteriores.
@@ -62,8 +70,9 @@ independiente terminada en _test; no se sustituye por la base de producción.
 
 ## Cómo revisar
 
-Ingresar como ASISTENTE, abrir Consultar historial de pagos y seleccionar una
-obligación. Comprobar el resumen y la lista; abrir Ver comprobante en un pago con
+Ingresar como ASISTENTE, abrir Consultar historial de pagos y buscar una
+obligación por concepto, beneficiario, número o estado. Pulsar su fila o Ver
+historial. Comprobar debajo el resumen y la lista; abrir Ver comprobante en un pago con
 imagen propia. Registrar otro abono, volver al historial y comprobar el nuevo pago
 junto con los anteriores. Para una obligación sin pagos, comprobar el mensaje vacío.
 

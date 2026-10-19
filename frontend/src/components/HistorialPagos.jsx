@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAutenticacion } from '../auth/useAuth'
 import { formatearImporte } from '../lib/formatearImporte'
 import { convertirACentimos } from '../lib/validarAbono'
@@ -7,6 +7,12 @@ import './HistorialPagos.css'
 const formatoFecha = new Intl.DateTimeFormat('es-PE', {
   timeZone: 'America/Lima', dateStyle: 'medium', timeStyle: 'short',
 })
+
+const etiquetasEstado = { PENDIENTE: 'Pendiente', PARCIAL: 'Parcial', PAGADO: 'Pagado' }
+
+function normalizarBusqueda(texto) {
+  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-PE').trim()
+}
 
 function saldoCalculado(historial) {
   const saldo = convertirACentimos(historial.monto_original) - convertirACentimos(historial.total_abonado)
@@ -150,6 +156,17 @@ export function HistorialPagos() {
   const [estado, establecerEstado] = useState({ cargando: true, obligaciones: [], error: '' })
   const [seleccionado, establecerSeleccionado] = useState('')
   const [intento, establecerIntento] = useState(0)
+  const [busqueda, establecerBusqueda] = useState('')
+  const indiceBusqueda = useMemo(() => estado.obligaciones.map((obligacion) => ({
+    obligacion,
+    texto: normalizarBusqueda([obligacion.id, '#' + obligacion.id, obligacion.concepto, obligacion.beneficiario, obligacion.estado_economico].join(' ')),
+  })), [estado.obligaciones])
+  const obligacionesVisibles = useMemo(() => {
+    const terminos = normalizarBusqueda(busqueda).split(/\s+/).filter(Boolean)
+    return indiceBusqueda.filter(({ texto }) => terminos.every((termino) => texto.includes(termino))).map(({ obligacion }) => obligacion)
+  }, [indiceBusqueda, busqueda])
+  const obligacionSeleccionada = estado.obligaciones.find((obligacion) => String(obligacion.id) === seleccionado)
+  const seleccionFueraDeBusqueda = obligacionSeleccionada && !obligacionesVisibles.some((obligacion) => String(obligacion.id) === seleccionado)
   useEffect(() => {
     const controlador = new AbortController()
     solicitar('/api/obligaciones', { signal: controlador.signal })
@@ -171,7 +188,7 @@ export function HistorialPagos() {
 
   return <section className="historial-pagos" aria-labelledby="titulo-historial">
     <h3 id="titulo-historial">Consultar historial de pagos</h3>
-    <p className="description">Selecciona una obligación para consultar sus pagos realizados, incluidas las obligaciones pagadas.</p>
+    <p className="description">Busca una obligación y selecciona su fila para consultar los pagos debajo, incluidas las obligaciones pagadas.</p>
     {estado.cargando && <p role="status">Cargando obligaciones…</p>}
     {estado.error && <>
       <p className="error-message" role="alert">{estado.error}</p>
@@ -179,15 +196,41 @@ export function HistorialPagos() {
     </>}
     {!estado.cargando && !estado.error && <>
       <div className="historial-seleccion">
-        <div className="field"><label htmlFor="obligacion-historial">Obligación a consultar</label>
-          <select id="obligacion-historial" value={seleccionado} onChange={(evento) => establecerSeleccionado(evento.target.value)}>
-            <option value="">Selecciona una obligación</option>
-            {estado.obligaciones.map((obligacion) => <option key={obligacion.id} value={obligacion.id}>{obligacion.concepto} — {obligacion.estado_economico}</option>)}
-          </select>
+        <div className="field"><label htmlFor="buscar-historial">Buscar obligaciones</label>
+          <input id="buscar-historial" type="search" value={busqueda} placeholder="Concepto, beneficiario, estado o número" onChange={(evento) => establecerBusqueda(evento.target.value)} />
         </div>
-        <button type="button" className="secondary-button" onClick={actualizarObligaciones}>Actualizar obligaciones</button>
+        <div className="historial-acciones">
+          {busqueda && <button type="button" className="secondary-button" onClick={() => establecerBusqueda('')}>Limpiar búsqueda</button>}
+          <button type="button" className="secondary-button" onClick={actualizarObligaciones}>Actualizar obligaciones</button>
+        </div>
       </div>
-      {estado.obligaciones.length === 0 && <p className="empty-state" role="status">Todavía no hay obligaciones registradas para consultar.</p>}
+      <p className="historial-resultados" role="status">{obligacionesVisibles.length} de {estado.obligaciones.length} obligaciones</p>
+      {estado.obligaciones.length === 0 ? <p className="empty-state" role="status">Todavía no hay obligaciones registradas para consultar.</p>
+        : obligacionesVisibles.length === 0 ? <p className="empty-state" role="status">No hay obligaciones que coincidan con la búsqueda.</p>
+          : <div className="historial-tabla-contenedor" role="region" aria-label="Tabla de obligaciones" tabIndex={0}>
+            <table className="historial-tabla" aria-label="Obligaciones para consultar historial">
+              <caption>Obligaciones del negocio. Selecciona una fila o pulsa Ver historial.</caption>
+              <thead><tr>
+                <th scope="col">Concepto</th><th scope="col">Beneficiario</th><th scope="col">Monto original</th>
+                <th scope="col">Saldo pendiente</th><th scope="col">Estado</th><th scope="col">Acción</th>
+              </tr></thead>
+              <tbody>{obligacionesVisibles.map((obligacion) => {
+                const elegida = seleccionado === String(obligacion.id)
+                return <tr key={obligacion.id} className={elegida ? 'historial-fila-seleccionada' : ''} onClick={() => establecerSeleccionado(String(obligacion.id))}>
+                  <th scope="row">{obligacion.concepto}<small className="historial-numero">#{obligacion.id}</small></th>
+                  <td>{obligacion.beneficiario || '—'}</td>
+                  <td className="historial-importe">{formatearImporte(obligacion.monto_original)}</td>
+                  <td className="historial-importe">{formatearImporte(obligacion.saldo_pendiente)}</td>
+                  <td><span className={'historial-estado historial-estado-' + obligacion.estado_economico.toLowerCase()}>{etiquetasEstado[obligacion.estado_economico] || obligacion.estado_economico}</span></td>
+                  <td><button type="button" className="secondary-button" aria-label={'Ver historial de ' + obligacion.concepto + ' (#' + obligacion.id + ')'} aria-pressed={elegida} onClick={(evento) => {
+                    evento.stopPropagation()
+                    establecerSeleccionado(String(obligacion.id))
+                  }}>{elegida ? 'Seleccionado' : 'Ver historial'}</button></td>
+                </tr>
+              })}</tbody>
+            </table>
+          </div>}
+      {seleccionFueraDeBusqueda && <p className="description">El historial de <strong>{obligacionSeleccionada.concepto}</strong> sigue abierto debajo. Esta obligación no coincide con la búsqueda actual.</p>}
       {seleccionado && <ConsultaHistorialObligacion key={seleccionado} identificador={seleccionado} />}
     </>}
   </section>
