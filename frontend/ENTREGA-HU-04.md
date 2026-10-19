@@ -1,3 +1,53 @@
+# Integración de HU-04 — para revisión de Quinde
+
+Esta sección describe los cambios de integración para revisión. La interfaz
+original pertenece a Quinde. El informe del PR #11 se conserva como referencia
+histórica y describe la interfaz antes de conectar el backend.
+
+## Compatibilidad y cambios preparados
+
+Se incorporó origin/main (0109f78, PR #11) a la rama de Haro mediante la fusión
+local autorizada bef31dc, sin conflictos, sin modificar main ni subir la rama.
+
+- FormularioAbono.jsx conserva el registro JSON de HU-03 sin archivo.
+- Si hay comprobante, primero confirma el abono y toma resultado.abono.id.
+  Después carga FormData en POST /api/abonos/:id/comprobante con campo comprobante.
+- Al fallar el archivo, el abono sigue confirmado. La pantalla bloquea un nuevo
+  envío monetario y ofrece reintentar solo el archivo o consultar su asociación.
+  Mientras el resultado sea incierto conserva el mismo archivo y no permite
+  cambiar de obligación. Esto funciona también con saldo cero.
+- Tras una validación 422 se permite corregir el archivo del abono ya guardado.
+  Los errores 403 y de red se muestran sin confirmar falsamente el archivo.
+- Consulta GET /api/abonos/:id/comprobante y descarga autenticada mediante
+  GET /api/abonos/:id/comprobante/archivo. La URL no contiene tokens.
+- SelectorComprobante.jsx mantiene su diseño, validación y vista previa; se
+  actualiza el aviso que antes decía que el backend no estaba disponible.
+- api.js admite FormData sin forzar Content-Type y blob de descarga. Su
+  comportamiento JSON y gestión de 401 se mantienen.
+- Pruebas de componentes y cliente HTTP en comprobantes.test.jsx y api.test.js.
+- E2E nueva en e2e/comprobantes.spec.js, con persistencia MySQL real.
+
+El estado de reintento está en memoria de esta pantalla. No se añade persistencia
+de sesión ni historial HU-05. Cambiar de módulo, cerrar o recargar abandona ese
+estado; si se conoce el ID, la API permite consultar el comprobante del abono.
+Nunca volver a registrar un abono ya confirmado para resolver un fallo de archivo.
+
+## Resultados comprobados el 18/10/2026
+
+- Backend: 82/82; check y lint aprobados. No requiere correcciones para integrar.
+- Frontend: 110/110; lint y build aprobados.
+- E2E: 9/9 con MySQL aislado existente en sgcp_test.
+- Los casos nuevos confirman que tras un fallo de carga previo al almacenamiento
+  queda un abono y cero comprobantes; tras reintentar queda el mismo abono y un
+  comprobante, con idéntico saldo.
+- La pérdida de respuesta después de almacenar el archivo permite reintentar con
+  200 sin duplicar comprobante ni abono, incluso con saldo cero.
+- La consulta y descarga autenticadas se comprobaron en navegador.
+- Las pruebas solo limpian sus filas y archivos generados. No usan Docker.
+- No hay cambios nuevos de backend, migraciones, estilos ni panel del GERENTE.
+
+---
+
 # SGCP-9 — HU-04 | Registrar medio de pago y comprobante
 
 Rama: `funcionalidad/SGCP-9-interfaz-comprobantes`, creada desde `main`

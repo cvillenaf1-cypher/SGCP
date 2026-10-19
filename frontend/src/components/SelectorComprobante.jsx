@@ -41,7 +41,7 @@ export function SelectorComprobante({ archivo, error, deshabilitado, alCambiar }
       <p className="comprobante-nombre">Archivo seleccionado: <strong>{archivo.name}</strong> ({(archivo.size / 1024 / 1024).toFixed(2)} MB)</p>
       {vistaPrevia && !falloImagen && <img className="comprobante-imagen" src={vistaPrevia} alt={`Vista previa local de ${archivo.name}`}
         onError={() => { establecerFalloImagen(true); establecerVistaPrevia(''); entrada.current.value = ''; alCambiar(null, 'No se pudo visualizar el comprobante. Selecciona una imagen JPG o PNG válida.') }} />}
-      <p className="notice">Vista previa local: el archivo aún no se ha subido. La carga y consulta de comprobantes están pendientes del backend. Para registrar el abono sin comprobante, quita el archivo.</p>
+      <p className="notice">Vista previa local: el archivo aún no se ha subido. Se adjuntará al abono después de confirmar su registro. Puedes quitarlo para continuar sin comprobante.</p>
     </>}
   </section>
 }
