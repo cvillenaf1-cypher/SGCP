@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url'
+import { isAbsolute } from 'node:path'
 import dotenv from 'dotenv'
 
 export function cargarEntorno() {
@@ -28,6 +29,13 @@ export function leerConfiguracion(entorno = process.env) {
   if (entorno.NODE_ENV === 'production' && url.protocol !== 'https:') {
     throw new Error('FRONTEND_URL debe usar HTTPS en producción.')
   }
+  const rutaCaSsl = entorno.DB_SSL_CA_PATH?.trim() || undefined
+  if (entorno.NODE_ENV === 'production' && !rutaCaSsl) {
+    throw new Error('DB_SSL_CA_PATH es obligatorio en producción.')
+  }
+  if (rutaCaSsl && !isAbsolute(rutaCaSsl)) {
+    throw new Error('DB_SSL_CA_PATH debe ser una ruta absoluta al certificado CA.')
+  }
 
   return {
     port: entero(entorno.PORT, 3000, 1, 65535, 'PORT'),
@@ -41,6 +49,7 @@ export function leerConfiguracion(entorno = process.env) {
       database: entorno.DB_NAME,
       user: entorno.DB_USER,
       password: entorno.DB_PASSWORD,
+      rutaCaSsl,
     },
   }
 }
