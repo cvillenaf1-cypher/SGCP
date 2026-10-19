@@ -157,16 +157,19 @@ export function HistorialPagos() {
   const [seleccionado, establecerSeleccionado] = useState('')
   const [intento, establecerIntento] = useState(0)
   const [busqueda, establecerBusqueda] = useState('')
+  const [filtroEstado, establecerFiltroEstado] = useState('')
   const indiceBusqueda = useMemo(() => estado.obligaciones.map((obligacion) => ({
     obligacion,
     texto: normalizarBusqueda([obligacion.id, '#' + obligacion.id, obligacion.concepto, obligacion.beneficiario, obligacion.estado_economico].join(' ')),
   })), [estado.obligaciones])
   const obligacionesVisibles = useMemo(() => {
     const terminos = normalizarBusqueda(busqueda).split(/\s+/).filter(Boolean)
-    return indiceBusqueda.filter(({ texto }) => terminos.every((termino) => texto.includes(termino))).map(({ obligacion }) => obligacion)
-  }, [indiceBusqueda, busqueda])
+    return indiceBusqueda.filter(({ obligacion, texto }) =>
+      (!filtroEstado || obligacion.estado_economico === filtroEstado)
+      && terminos.every((termino) => texto.includes(termino))).map(({ obligacion }) => obligacion)
+  }, [indiceBusqueda, busqueda, filtroEstado])
   const obligacionSeleccionada = estado.obligaciones.find((obligacion) => String(obligacion.id) === seleccionado)
-  const seleccionFueraDeBusqueda = obligacionSeleccionada && !obligacionesVisibles.some((obligacion) => String(obligacion.id) === seleccionado)
+  const seleccionFueraDeFiltros = obligacionSeleccionada && !obligacionesVisibles.some((obligacion) => String(obligacion.id) === seleccionado)
   useEffect(() => {
     const controlador = new AbortController()
     solicitar('/api/obligaciones', { signal: controlador.signal })
@@ -188,7 +191,7 @@ export function HistorialPagos() {
 
   return <section className="historial-pagos" aria-labelledby="titulo-historial">
     <h3 id="titulo-historial">Consultar historial de pagos</h3>
-    <p className="description">Busca una obligación y selecciona su fila para consultar los pagos debajo, incluidas las obligaciones pagadas.</p>
+    <p className="description">Busca una obligación, filtra por su estado y selecciona su fila para consultar los pagos debajo, incluidas las obligaciones pagadas.</p>
     {estado.cargando && <p role="status">Cargando obligaciones…</p>}
     {estado.error && <>
       <p className="error-message" role="alert">{estado.error}</p>
@@ -199,6 +202,14 @@ export function HistorialPagos() {
         <div className="field"><label htmlFor="buscar-historial">Buscar obligaciones</label>
           <input id="buscar-historial" type="search" value={busqueda} placeholder="Concepto, beneficiario, estado o número" onChange={(evento) => establecerBusqueda(evento.target.value)} />
         </div>
+        <div className="field"><label htmlFor="estado-historial">Filtrar por estado</label>
+          <select id="estado-historial" value={filtroEstado} onChange={(evento) => establecerFiltroEstado(evento.target.value)}>
+            <option value="">Todos</option>
+            <option value="PAGADO">Pagados</option>
+            <option value="PENDIENTE">Pendientes</option>
+            <option value="PARCIAL">Parciales</option>
+          </select>
+        </div>
         <div className="historial-acciones">
           {busqueda && <button type="button" className="secondary-button" onClick={() => establecerBusqueda('')}>Limpiar búsqueda</button>}
           <button type="button" className="secondary-button" onClick={actualizarObligaciones}>Actualizar obligaciones</button>
@@ -206,7 +217,9 @@ export function HistorialPagos() {
       </div>
       <p className="historial-resultados" role="status">{obligacionesVisibles.length} de {estado.obligaciones.length} obligaciones</p>
       {estado.obligaciones.length === 0 ? <p className="empty-state" role="status">Todavía no hay obligaciones registradas para consultar.</p>
-        : obligacionesVisibles.length === 0 ? <p className="empty-state" role="status">No hay obligaciones que coincidan con la búsqueda.</p>
+        : obligacionesVisibles.length === 0 ? <p className="empty-state" role="status">{filtroEstado
+          ? 'No hay obligaciones que coincidan con la búsqueda y el estado seleccionado.'
+          : 'No hay obligaciones que coincidan con la búsqueda.'}</p>
           : <div className="historial-tabla-contenedor" role="region" aria-label="Tabla de obligaciones" tabIndex={0}>
             <table className="historial-tabla" aria-label="Obligaciones para consultar historial">
               <caption>Obligaciones del negocio. Selecciona una fila o pulsa Ver historial.</caption>
@@ -230,7 +243,7 @@ export function HistorialPagos() {
               })}</tbody>
             </table>
           </div>}
-      {seleccionFueraDeBusqueda && <p className="description">El historial de <strong>{obligacionSeleccionada.concepto}</strong> sigue abierto debajo. Esta obligación no coincide con la búsqueda actual.</p>}
+      {seleccionFueraDeFiltros && <p className="description">El historial de <strong>{obligacionSeleccionada.concepto}</strong> sigue abierto debajo. Esta obligación no coincide con los filtros actuales.</p>}
       {seleccionado && <ConsultaHistorialObligacion key={seleccionado} identificador={seleccionado} />}
     </>}
   </section>
