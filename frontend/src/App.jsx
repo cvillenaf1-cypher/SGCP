@@ -14,6 +14,7 @@ function Aplicacion() {
 
   const ubicacion = useLocation()
   const esPaginaInicioSesion = ubicacion.pathname === '/login'
+  const esModuloGerente = usuario?.role === 'GERENTE' && ubicacion.pathname.startsWith('/gerente')
 
   const [cerrando, establecerCerrando] = useState(false)
   const [error, establecerError] = useState('')
@@ -36,22 +37,21 @@ function Aplicacion() {
   return (
     <div
       className={`app-shell ${
-        esPaginaInicioSesion ? 'app-shell--login' : ''
+        esPaginaInicioSesion ? 'app-shell--login' : esModuloGerente ? 'app-shell--gerente' : ''
       }`}
     >
 
       {/* Encabezado: visible solamente fuera del login */}
       {!esPaginaInicioSesion && (
         <header className="app-header">
-          <span className="brand">SGCP</span>
+          <span className="brand">{esModuloGerente ? <>S<span>A</span>PO</> : 'SGCP'}</span>
 
           <h1>
-            Sistema de Gestión y Control de Pagos (SGCP)
+            {esModuloGerente ? 'Sistema de Administración de Pagos y Obligaciones' : 'Sistema de Gestión y Control de Pagos (SGCP)'}
           </h1>
 
           <p className="description">
-            Organización y seguimiento de los compromisos
-            económicos del negocio.
+            {esModuloGerente ? 'Espacio del gerente' : 'Organización y seguimiento de los compromisos económicos del negocio.'}
           </p>
 
           {usuario && (
@@ -148,7 +148,7 @@ function Aplicacion() {
       {/* Pie de página: oculto durante el login */}
       {!esPaginaInicioSesion && (
         <footer className="app-footer">
-          Moneda: soles (S/). SGCP registra operaciones
+          Moneda: soles (S/). {esModuloGerente ? 'SAPO' : 'SGCP'} registra operaciones
           externas; no realiza transferencias ni cobros.
         </footer>
       )}

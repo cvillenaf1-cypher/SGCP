@@ -1,25 +1,836 @@
-.navegacion-gerente { margin-top: 20px; }
-.pagos-del-mes .panel-heading { margin-top: 20px; }
-.filtros-pagos { display: flex; flex-wrap: wrap; gap: 12px 24px; }
-.filtros-pagos .field { flex: 1 1 180px; margin: 12px 0; }
-.filtros-pagos select {
+/* El marco SAPO se activa únicamente en las rutas autorizadas del gerente. */
+#root:has(.app-shell--gerente) {
+  display: block;
+  padding: 0;
+  background: #f5f8fc;
+}
+
+.app-shell.app-shell--gerente {
+  --gerente-azul: #041e38;
+  --gerente-verde: #008b61;
+  --gerente-esmeralda: #13e4a6;
+  width: 100%;
+  min-height: 100svh;
+  color: var(--gerente-azul);
+  background: #f5f8fc;
+}
+
+.app-shell--gerente .app-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0 24px;
+  margin: 0;
+  padding: 24px max(28px, calc((100% - 1224px) / 2));
+  background: var(--gerente-azul);
+  color: white;
+  border-bottom: 3px solid var(--gerente-esmeralda);
+}
+
+.app-shell--gerente .brand {
+  grid-row: span 2;
+  color: white;
+  font-size: 2.65rem;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+
+.app-shell--gerente .brand span {
+  color: var(--gerente-esmeralda);
+}
+
+.app-shell--gerente .app-header h1 {
+  margin: 0;
+  max-width: 400px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.app-shell--gerente .app-header>.description {
+  grid-column: 2;
+  margin: 4px 0 0;
+  color: #13e4a6;
+  font-size: 0.75rem;
+}
+
+.app-shell--gerente .session-bar {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  margin: 0;
+  padding: 0 0 0 28px;
+  border: 0;
+  border-left: 1px solid #ffffff30;
+  gap: 24px;
+}
+
+.app-shell--gerente .session-bar strong {
+  display: block;
+  max-width: 200px;
+  overflow-wrap: anywhere;
+  font-size: 0.88rem;
+}
+
+.app-shell--gerente .role-label {
+  color: #bfcedd;
+  font-size: 0.78rem;
+}
+
+.app-shell--gerente .secondary-button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid #ffffff45;
+  border-radius: 9px;
+  background: transparent;
+  color: white;
+  font-size: 0.8rem;
+}
+
+.app-shell--gerente .secondary-button:hover:not(:disabled) {
+  background: #ffffff15;
+}
+
+.app-shell--gerente .app-header>.error-message {
+  grid-column: 1 / -1;
+}
+
+.app-shell--gerente main {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: 36px 28px;
+}
+
+.app-shell--gerente .app-footer {
+  margin: 0;
+  padding: 20px 28px 28px;
+  color: #596c7e;
+  font-size: 0.75rem;
+}
+
+.pagos-del-mes,
+.inicio-gerente {
+  color: #041e38;
+  min-width: 0;
+}
+
+.icono-gerente {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.enlace-volver-gerente {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 26px;
+  color: #52677b;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.enlace-volver-gerente:hover {
+  color: #007653;
+  text-decoration: underline;
+}
+
+.encabezado-consulta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.etiqueta-gerente {
+  margin: 0 0 8px;
+  color: #007653;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+
+.encabezado-consulta h2 {
+  margin: 0;
+  font-size: clamp(1.65rem, 3vw, 2.15rem);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+
+.encabezado-consulta h2+p {
+  max-width: 650px;
+  margin: 12px 0 0;
+  color: #596c7e;
+  font-size: 0.9rem;
+}
+
+.insignia-lectura {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border: 1px solid #c9e7dc;
+  border-radius: 100px;
+  color: #006747;
+  background: #e9f7f0;
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.insignia-lectura .icono-gerente {
+  width: 15px;
+  height: 15px;
+}
+
+.tarjeta-periodo,
+.resultados-pagos,
+.navegacion-gerente {
+  border: 1px solid #e0e8f0;
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 5px 24px #041e3805;
+}
+
+.tarjeta-periodo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 24px 28px;
+  margin-bottom: 24px;
+}
+
+.introduccion-periodo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.simbolo-periodo {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #d9eee5;
+  border-radius: 12px;
+  color: #007653;
+  background: #eef9f4;
+}
+
+.introduccion-periodo h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.introduccion-periodo p {
+  margin: 3px 0 0;
+  color: #596c7e;
+  font-size: 0.8rem;
+}
+
+.filtros-pagos {
+  display: flex;
+  flex: 0 1 380px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.campo-periodo {
+  display: grid;
+  gap: 6px;
+  flex: 1 1 130px;
+}
+
+.campo-periodo label {
+  color: #42576b;
+  font-size: 0.75rem;
+}
+
+.campo-periodo select,
+.campo-periodo input {
   width: 100%;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid #8b9cb2;
-  border-radius: 8px;
-  color: #1d2b40;
-  background: #fff;
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 1px solid #ccd9e3;
+  border-radius: 10px;
+  background: #fbfcfe;
+  color: #041e38;
   font: inherit;
+  font-size: 0.9rem;
 }
-.filtros-pagos select:focus-visible,
-.contenedor-tabla-pagos:focus-visible { outline: 3px solid #b1c7ef; outline-offset: 1px; }
-.contenedor-tabla-pagos { max-width: 100%; overflow-x: auto; margin-top: 20px; }
-.tabla-pagos { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-.tabla-pagos caption { text-align: left; font-weight: 600; padding-bottom: 12px; }
-.tabla-pagos th, .tabla-pagos td { padding: 12px; border-bottom: 1px solid #dce5ef; vertical-align: top; }
-.tabla-pagos thead { background: #e8f0ff; color: #234b91; }
-.tabla-pagos tbody th, .tabla-pagos td:nth-child(2) { min-width: 140px; overflow-wrap: anywhere; }
-.tabla-pagos .monto-pago { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.tabla-pagos .fecha-pago { white-space: nowrap; }
-.estado-pago { font-weight: 600; }
+
+.campo-periodo input {
+  max-width: 140px;
+}
+
+.campo-periodo input[aria-invalid='true'] {
+  border-color: #b13333;
+}
+
+.tarjeta-periodo .field-error {
+  flex-basis: 100%;
+}
+
+.pagos-del-mes :is(select, input, a, [tabindex]):focus-visible,
+.inicio-gerente a:focus-visible {
+  outline: 3px solid #008b61;
+  outline-offset: 4px;
+}
+
+.resultados-pagos {
+  overflow: hidden;
+}
+
+.encabezado-resultados {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 26px 28px 22px;
+}
+
+.encabezado-resultados h3 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 650;
+}
+
+.encabezado-resultados .etiqueta-gerente {
+  margin-bottom: 5px;
+}
+
+.cantidad-pagos {
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: #f0f4f8;
+  color: #52677b;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.contenedor-tabla-pagos {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.tabla-pagos {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.83rem;
+}
+
+.tabla-pagos th,
+.tabla-pagos td {
+  padding: 19px 20px;
+  border-bottom: 1px solid #eaf0f5;
+  vertical-align: middle;
+}
+
+.tabla-pagos th:first-child,
+.tabla-pagos td:first-child {
+  padding-left: 28px;
+}
+
+.tabla-pagos th:last-child,
+.tabla-pagos td:last-child {
+  padding-right: 28px;
+}
+
+.tabla-pagos thead {
+  background: #f5f8fc;
+  color: #52677b;
+}
+
+.tabla-pagos thead th {
+  padding-top: 13px;
+  padding-bottom: 13px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tabla-pagos thead th:nth-child(3),
+.tabla-pagos thead th:nth-child(4) {
+  text-align: right;
+}
+
+.tabla-pagos tbody th {
+  min-width: 160px;
+  max-width: 280px;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.tabla-pagos td:nth-child(2) {
+  min-width: 130px;
+  max-width: 220px;
+  overflow-wrap: anywhere;
+  color: #596c7e;
+}
+
+.tabla-pagos tbody tr:hover {
+  background: #f9fcfb;
+}
+
+.tabla-pagos .monto-pago {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla-pagos .saldo-pago {
+  font-weight: 650;
+}
+
+.tabla-pagos .fecha-pago {
+  white-space: nowrap;
+  color: #52677b;
+  font-variant-numeric: tabular-nums;
+}
+
+.estado-pago {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid #eadbb0;
+  border-radius: 7px;
+  background: #fff8e7;
+  color: #795500;
+  font-size: 0.72rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.estado-pago::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.estado-pago[data-estado='Parcial'] {
+  border-color: #cbddee;
+  background: #eef5fc;
+  color: #245b8b;
+}
+
+.estado-pago[data-estado='Pagado'] {
+  border-color: #c6e7d8;
+  background: #eaf8f0;
+  color: #006747;
+}
+
+.nota-consulta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 17px 28px;
+  color: #596c7e;
+  background: #fcfdfe;
+  font-size: 0.72rem;
+}
+
+.nota-consulta .icono-gerente {
+  width: 14px;
+  height: 14px;
+}
+
+.mensaje-consulta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  padding: 32px 24px;
+  border-top: 1px solid #edf1f5;
+  text-align: center;
+}
+
+.mensaje-consulta>.icono-gerente {
+  box-sizing: content-box;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  color: #007653;
+  background: #eef9f4;
+}
+
+.mensaje-consulta h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.mensaje-consulta p {
+  max-width: 560px;
+  margin: 3px 0;
+  color: #596c7e;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.mensaje-consulta--error>.icono-gerente {
+  color: #a32323;
+  background: #fff1f1;
+}
+
+.mensaje-consulta--error h3 {
+  color: #a32323;
+}
+
+.indicador-carga {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 22px;
+  border: 3px solid #dcf3e9;
+  border-top-color: #008b61;
+  border-radius: 50%;
+  animation: giro-consulta 0.9s linear infinite;
+}
+
+@keyframes giro-consulta {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .indicador-carga {
+    animation: none;
+  }
+}
+
+.acceso-gerente {
+  color: #007653;
+  font-size: 0.85rem;
+}
+
+.navegacion-gerente {
+  max-width: 560px;
+  padding: 28px;
+  margin-top: 24px;
+  border-top: 3px solid #008b61;
+}
+
+.navegacion-gerente a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #041e38;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.navegacion-gerente a>.icono-gerente {
+  color: #008b61;
+}
+
+.navegacion-gerente a>span:last-child {
+  margin-left: auto;
+  color: #008b61;
+}
+
+.navegacion-gerente a:hover {
+  color: #007653;
+  text-decoration: underline;
+}
+
+.navegacion-gerente p {
+  margin: 14px 0 0;
+  color: #596c7e;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 960px) {
+  .app-shell--gerente .app-header {
+    gap: 0 16px;
+    padding: 22px 24px;
+  }
+
+  .app-shell--gerente .session-bar {
+    padding-left: 16px;
+    gap: 12px;
+  }
+
+  .app-shell--gerente .app-header h1 {
+    max-width: 260px;
+    font-size: 0.8rem;
+  }
+
+  .tarjeta-periodo {
+    align-items: flex-start;
+  }
+
+  .filtros-pagos {
+    flex: 1 1 300px;
+  }
+
+  .campo-periodo input {
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell--gerente .app-header {
+    grid-template-columns: auto 1fr;
+    padding: 20px;
+  }
+
+  .app-shell--gerente .brand {
+    font-size: 2.2rem;
+  }
+
+  .app-shell--gerente .session-bar {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 18px;
+    padding: 16px 0 0;
+    border-left: 0;
+    border-top: 1px solid #ffffff25;
+  }
+
+  .app-shell--gerente main {
+    padding: 24px 16px;
+  }
+
+  .encabezado-consulta {
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+
+  .encabezado-consulta h2+p {
+    font-size: 0.85rem;
+  }
+
+  .tarjeta-periodo {
+    padding: 20px;
+    border-radius: 14px;
+  }
+
+  .introduccion-periodo p {
+    max-width: 210px;
+  }
+
+  .filtros-pagos {
+    flex-basis: 100%;
+    gap: 12px;
+  }
+
+  .campo-periodo {
+    flex-basis: 100px;
+  }
+
+  .encabezado-resultados {
+    padding: 22px 20px 16px;
+  }
+
+  .encabezado-resultados h3 {
+    font-size: 0.95rem;
+  }
+
+  .resultados-pagos {
+    border-radius: 14px;
+  }
+
+  .tabla-pagos,
+  .tabla-pagos tbody {
+    display: block;
+  }
+
+  .tabla-pagos caption {
+    display: block;
+    padding: 0 20px 16px;
+  }
+
+  /* Se conserva la cabecera para lectores de pantalla y cada celda muestra su etiqueta. */
+  .tabla-pagos thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .tabla-pagos tbody {
+    padding: 0 12px;
+  }
+
+  .tabla-pagos tbody tr {
+    display: block;
+    margin-bottom: 12px;
+    padding: 8px 16px;
+    border: 1px solid #e0e8f0;
+    border-radius: 12px;
+  }
+
+  .tabla-pagos tbody :is(th, td) {
+    display: grid;
+    grid-template-columns: minmax(100px, 0.9fr) minmax(0, 1.1fr);
+    gap: 12px;
+    align-items: center;
+    min-width: 0;
+    max-width: none;
+    padding: 10px 0;
+    text-align: right;
+    font-size: 0.8rem;
+  }
+
+  .tabla-pagos tbody :is(th, td)::before {
+    content: attr(data-etiqueta);
+    color: #596c7e;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 500;
+  }
+
+  .tabla-pagos tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .tabla-pagos tbody td:nth-child(2) {
+    min-width: 0;
+    max-width: none;
+  }
+
+  .tabla-pagos .monto-pago,
+  .tabla-pagos .fecha-pago {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .tabla-pagos .estado-pago {
+    justify-self: end;
+  }
+
+  .nota-consulta {
+    align-items: flex-start;
+    padding: 16px 20px;
+    font-size: 0.68rem;
+  }
+
+  .navegacion-gerente {
+    padding: 22px;
+  }
+}
+
+/* SAPO: selector de años para la consulta mensual */
+
+.pagos-del-mes .filtros-pagos {
+  flex: 1 1 540px;
+  max-width: 100%;
+  align-items: end;
+}
+
+.pagos-del-mes .campo-periodo--anios {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.campo-periodo--anios>span {
+  color: #42576b;
+  font-size: 0.75rem;
+}
+
+.barra-anios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.boton-anio {
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #d5e3e9;
+  border-radius: 10px;
+  background: #f5f8fc;
+  color: #041e38;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.boton-anio:hover {
+  border-color: #008b61;
+  background: #e9f8f1;
+}
+
+.boton-anio--activo,
+.boton-anio--activo:hover {
+  background: #008b61;
+  border-color: #008b61;
+  color: #ffffff;
+}
+
+.boton-anio:focus-visible {
+  outline: 3px solid #13e4a6;
+  outline-offset: 3px;
+}
+
+/* Adaptación para celulares */
+
+@media (max-width: 640px) {
+  .pagos-del-mes .filtros-pagos {
+    flex-basis: 100%;
+  }
+
+  .pagos-del-mes .campo-periodo--anios {
+    flex-basis: 100%;
+  }
+
+  .barra-anios {
+    gap: 6px;
+  }
+
+  .boton-anio {
+    flex: 1 1 65px;
+    padding: 10px 8px;
+    font-size: 0.82rem;
+  }
+}
+
+.pagos-del-mes .descripcion-periodo {
+  margin: 6px 0 0;
+  color: #607487;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  max-width: 650px;
+}
+
+.pagos-del-mes .cantidad-pagos {
+  padding: 10px 16px;
+  border: 1px solid #b7e7d4;
+  border-radius: 999px;
+  background: #e8f7f1;
+  color: #006d4d;
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pagos-del-mes .introduccion-periodo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  min-height: 140px;
+}
+
+.pagos-del-mes .introduccion-periodo h3,
+.pagos-del-mes .introduccion-periodo p {
+  margin: 0;
+}

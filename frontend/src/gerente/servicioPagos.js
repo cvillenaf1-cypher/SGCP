@@ -1,12 +1,17 @@
-export class ErrorIntegracionPendiente extends Error {
-  constructor() {
-    super('La consulta de pagos aún no está conectada al servidor. No hay datos disponibles para consultar.')
-  }
-}
+const nombresEstado = { PENDIENTE: 'Pendiente', PARCIAL: 'Parcial', PAGADO: 'Pagado' }
 
-// Sustituir este adaptador cuando el equipo acuerde el endpoint y su respuesta.
-// Recibe { mes, anio, solicitar, senal }; devuelve una promesa con la lista de pagos.
-// Usar solicitar del contexto de autenticación, conservando Bearer y el manejo de 401.
-export async function consultarPagosDelMes() {
-  throw new ErrorIntegracionPendiente()
+export async function consultarPagosDelMes({ solicitar, senal }) {
+  // El listado existente incluye obligaciones pagadas; el período se filtra por fecha límite.
+  const datos = await solicitar('/api/obligaciones', { signal: senal })
+  if (!Array.isArray(datos?.obligaciones)) throw new Error('El servidor envió una lista de pagos inválida.')
+  return datos.obligaciones.map((obligacion) => {
+    if (typeof obligacion.fecha_limite !== 'string' || !nombresEstado[obligacion.estado_economico]) {
+      throw new Error('El servidor envió un pago inválido.')
+    }
+    return {
+      id: obligacion.id, concepto: obligacion.concepto, beneficiario: obligacion.beneficiario,
+      montoOriginal: obligacion.monto_original, saldoPendiente: obligacion.saldo_pendiente,
+      fechaLimite: obligacion.fecha_limite, estado: nombresEstado[obligacion.estado_economico],
+    }
+  })
 }
