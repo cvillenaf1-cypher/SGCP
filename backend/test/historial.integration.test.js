@@ -70,7 +70,7 @@ test('historial: inexistente es 404 y cero abonos es un historial vacío real', 
   const id = await crearObligacion()
   assert.deepEqual(await consultar(id), {
     obligacion_id: id, concepto: 'Historial de prueba',
-    monto_original: '100.00', saldo_pendiente: '100.00', total_abonado: '0.00',
+    monto_original: '100.00', saldo_pendiente: '100.00', saldo_pendiente_calculado: '100.00', total_abonado: '0.00',
     estado_economico: 'PENDIENTE', resumen_consistente: true, advertencia: null, abonos: [],
   })
 })
@@ -81,12 +81,14 @@ test('historial: un abono parcial y varios abonos completos suman importes exact
   let historial = await consultar(id)
   assert.equal(historial.total_abonado, '0.10')
   assert.equal(historial.saldo_pendiente, '0.20')
+  assert.equal(historial.saldo_pendiente_calculado, '0.20')
   assert.equal(historial.estado_economico, 'PARCIAL')
   assert.equal(historial.abonos[0].id, primero.abono.id)
   const segundo = await abonar(id, '0.20')
   historial = await consultar(id)
   assert.equal(historial.total_abonado, '0.30')
   assert.equal(historial.saldo_pendiente, '0.00')
+  assert.equal(historial.saldo_pendiente_calculado, '0.00')
   assert.equal(historial.estado_economico, 'PAGADO')
   assert.equal(historial.resumen_consistente, true)
   assert.deepEqual(new Set(historial.abonos.map((abono) => abono.id)), new Set([primero.abono.id, segundo.abono.id]))
@@ -150,6 +152,7 @@ test('historial: la consulta no modifica filas y advierte una inconsistencia sin
   const historial = await consultar(id)
   assert.equal(historial.total_abonado, '10.00')
   assert.equal(historial.saldo_pendiente, '80.00')
+  assert.equal(historial.saldo_pendiente_calculado, '90.00')
   assert.equal(historial.resumen_consistente, false)
   assert.match(historial.advertencia, /no coincide/)
   const [[fila]] = await conexiones.execute('SELECT saldo_pendiente FROM obligaciones WHERE id = ?', [id])
