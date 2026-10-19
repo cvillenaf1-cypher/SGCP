@@ -1,78 +1,70 @@
 # SGCP-10 — HU-05 | Consultar historial de pagos
 
-Rama: `funcionalidad/SGCP-10-interfaz-historial`. Creada desde `main`
-actualizado por avance rápido a `0109f78`, con HU-04 integrada. No se hizo merge.
+## Funcionamiento
 
-## Estado
+La pantalla del ASISTENTE consulta los pagos reales de la obligación seleccionada,
+incluidas las pagadas. Se retiraron el ejemplo visual y los avisos de integración
+pendiente. El listado conserva la consulta general de obligaciones existente.
 
-Vista del historial preparada para integración en el panel ASISTENTE, mediante
-**Consultar historial de pagos**. El backend revisado en `origin/main` dispone
-de registro de abonos, pero no de su consulta ni consulta de comprobantes.
-La historia todavía no está conectada al historial real de MySQL.
+Lecturas utilizadas con la sesión vigente:
 
-La selección de obligaciones, incluidas las pagadas, y sus datos generales sí
-usan las rutas existentes de Joel. Se muestra concepto, monto original y saldo
-pendiente real. El total acumulado y la lista de abonos se indican pendientes de
-consulta: no se infieren del saldo ni se presenta un historial vacío sin conocerlo.
+- `GET /api/obligaciones`: obligaciones disponibles para consultar.
+- `GET /api/obligaciones/:id/historial`: resumen y abonos registrados.
+- `GET /api/abonos/:id/comprobante/archivo`: imagen del comprobante autorizado.
 
-Se añadió **Ver ejemplo visual del historial** como vista separada y temporal,
-identificada expresamente como DATOS DE EJEMPLO, sin relación con la obligación
-real seleccionada. Muestra el resumen completo, total acumulado, saldo, montos,
-medios y fechas automáticas en America/Lima. Los abonos se ordenan del más reciente
-al más antiguo sin modificar los datos de origen. Incluye un caso sin abonos y
-comprobantes opcionales señalados sin inventar URLs o archivos almacenados.
+## Criterios de aceptación
 
-La pantalla es de solo lectura: no hay edición, eliminación ni escrituras.
-Incluye carga, errores, reintentos, actualización, negocio sin obligaciones y
-adaptación móvil. Descarta detalles obsoletos al cambiar de selección.
+| Criterio | Comportamiento implementado |
+| --- | --- |
+| Consultar un compromiso registrado | Selector de obligaciones reales, incluidas las pagadas. |
+| Fecha, monto y medio de pago | Cada fila muestra los tres datos del abono real. |
+| Más recientes primero | Orden descendente por fecha de registro y, en empates, por ID. |
+| Monto original | Se incluye en el resumen de la obligación. |
+| Total acumulado | El backend suma los abonos de la obligación con céntimos exactos. |
+| Saldo automático | Se muestra monto original menos total abonado, sin modificar el saldo almacenado al consultar. |
+| Soles y dos decimales | Todos los importes se presentan como S/ y dos decimales, sin cálculos monetarios con Number. |
+| Consultar comprobantes | Ver comprobante obtiene una imagen JPG/PNG con Bearer y la muestra en la misma pantalla. |
+| Sin abonos | Se indica que la obligación todavía no tiene abonos. |
+| Nuevos abonos | Al volver desde el registro o pulsar Actualizar historial se consultan los pagos actuales y se conservan los anteriores. |
+| Consulta de solo lectura | El historial solo ejecuta GET; el backend consulta mediante un SELECT sin escrituras ni bloqueos de pago. |
 
-## Archivos
+Las fechas se presentan en America/Lima y conservan su fecha UTC en el elemento
+time. Si el saldo almacenado difiere de monto original menos abonos, la pantalla
+muestra una advertencia y ambos valores, sin reparar registros al consultarlos.
 
-- `src/components/HistorialPagos.jsx`: selección, resumen real, vista de presentación y ejemplo.
-- `src/components/HistorialPagos.css`: estilos y disposición móvil.
-- `src/datos/ejemplosHistorial.js`: datos exclusivos del ejemplo visual, separados de la API.
-- `src/components/FuncionesAsistente.jsx`: navegación dentro del panel existente.
-- `src/test/historialPagos.test.jsx`: pruebas del historial y ejemplos.
-- `src/test/auth.test.jsx`: acceso exclusivo por rol y sesión vencida desde HU-05.
-- `ENTREGA-HU-05.md`: informe.
-
-## Conexión pendiente de Haro
-
-Ya conectadas las lecturas `GET /api/obligaciones` y `GET /api/obligaciones/:id`,
-mediante el cliente HTTP y la autenticación existentes. No se añadieron rutas.
-
-Haro debe entregar método y ruta de consulta del historial por obligación, campos
-de respuesta para resumen y abonos, formatos de fecha, errores y referencia o ruta
-autorizada de cada comprobante. Se adaptará la presentación al contrato real, se
-retirará el ejemplo temporal y se comprobarán los totales, orden, estado vacío y
-consulta protegida del archivo. No se asume que el modelo de ejemplo sea su JSON.
+Los comprobantes respetan los permisos existentes del backend. Un adjunto sin
+permiso se indica sin solicitar su archivo. No se incluyen tokens en enlaces.
+Cerrar la imagen, cambiar de obligación o abandonar la vista cancela las consultas
+pendientes y libera las URLs temporales de las imágenes.
 
 ## Verificación
 
-- `npm.cmd test`: 111 pruebas aprobadas en 7 archivos. Incluyen renderizado, lista de obligaciones pagadas y pendientes,
-  resumen real sin historial inventado, ejemplos separados, varios abonos,
-  orden descendente, totales, saldo, fechas, ausencia de comprobante, historial de
-  ejemplo vacío, errores, reintentos, respuestas obsoletas, solo lectura y roles.
-- `npm.cmd run lint` y `npm.cmd run build`: aprobados.
-- Recorrido adicional con Edge y API/MySQL locales: consulta real de una obligación,
-  total real marcado pendiente, ejemplo con tres abonos en el orden correcto,
-  ejemplo sin abonos, retorno a datos reales y ancho móvil de 390 px sin
-  desbordamiento. Se verificó que solo se solicitaron rutas GET existentes y no
-  se generaron escrituras. Capturas guardadas fuera de Git.
-- `git diff --check`: aprobado.
+Pruebas de componentes: historial, errores, actualización, importes exactos,
+obligaciones pagadas, respuestas obsoletas, comprobantes y sesión vencida.
+Pruebas de backend: resumen, orden, céntimos exactos, inconsistencias, solo lectura
+y registro de otro abono sin alterar pagos anteriores.
 
-No se han probado un historial real de MySQL, totales reales de abonos ni consulta
-de comprobantes almacenados: sus endpoints no existen. No se ejecutaron pruebas
-del backend ni toda la suite Playwright en esta entrega.
+La prueba de navegador usa la aplicación y su cliente HTTP reales con respuestas
+API interceptadas de prueba; no realiza pagos ni cambios en la base de producción.
+Desde frontend, con Chromium de Playwright instalado:
+
+```powershell
+npm.cmd test -- --maxWorkers=1
+npm.cmd run lint
+npm.cmd run build
+node node_modules/@playwright/test/cli.js test --config playwright.historial.config.js
+```
+
+Para usar Chrome instalado, establecer PLAYWRIGHT_CHANNEL=chrome antes del último
+comando. La configuración focalizada no requiere MySQL ni credenciales reales.
+La suite de integración MySQL del backend requiere backend/.env.test y una base
+independiente terminada en _test; no se sustituye por la base de producción.
 
 ## Cómo revisar
 
-Con API, MySQL y frontend iniciados, abrir `http://localhost:5173/#/login`, ingresar
-como ASISTENTE y pulsar **Consultar historial de pagos**. Seleccionar una obligación
-para ver concepto, monto original y saldo reales junto al aviso de consulta pendiente.
-Pulsar **Ver ejemplo visual del historial** para revisar el diseño con varios
-abonos o sin abonos. **Volver a obligaciones reales** abandona el ejemplo.
+Ingresar como ASISTENTE, abrir Consultar historial de pagos y seleccionar una
+obligación. Comprobar el resumen y la lista; abrir Ver comprobante en un pago con
+imagen propia. Registrar otro abono, volver al historial y comprobar el nuevo pago
+junto con los anteriores. Para una obligación sin pagos, comprobar el mensaje vacío.
 
-No se modificaron backend, migraciones, login, módulo del GERENTE, Jira ni AWS.
-Sin dependencias nuevas. Configuración local, credenciales y capturas permanecen
-fuera de Git. No se hicieron commit, push ni PR: cambios preparados para revisión.
+No se añaden dependencias, migraciones ni cambios de autenticación o infraestructura.

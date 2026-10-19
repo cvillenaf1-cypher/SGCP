@@ -34,12 +34,15 @@ export async function consultarHistorial(conexiones, obligacionId, usuarioId) {
   })
   const montoOriginal = aCentavos(obligacion.monto_original)
   const saldoPendiente = aCentavos(obligacion.saldo_pendiente)
-  const consistente = montoOriginal - totalCentavos === saldoPendiente
+  const saldoCalculado = montoOriginal - totalCentavos
+  const consistente = saldoCalculado === saldoPendiente
   return {
     obligacion_id: obligacion.obligacion_id,
     concepto: obligacion.concepto,
     monto_original: obligacion.monto_original,
     saldo_pendiente: obligacion.saldo_pendiente,
+    // Presentar la diferencia no corrige el saldo almacenado al consultar.
+    saldo_pendiente_calculado: saldoCalculado < 0n ? `-${desdeCentavos(-saldoCalculado)}` : desdeCentavos(saldoCalculado),
     total_abonado: desdeCentavos(totalCentavos),
     estado_economico: saldoPendiente === 0n ? 'PAGADO' : saldoPendiente === montoOriginal ? 'PENDIENTE' : 'PARCIAL',
     resumen_consistente: consistente,

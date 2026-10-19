@@ -130,6 +130,44 @@ describe('Acceso SGCP', () => {
     expect(llamada[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
   })
 
+  it('consulta el historial real con Bearer y únicamente realiza lecturas después del login', async () => {
+    const obligacion = { id: 81, concepto: 'Servicio de limpieza', monto_original: '100.00', saldo_pendiente: '0.00', estado_economico: 'PAGADO' }
+    fetch.mockResolvedValueOnce(respuesta(sesionPrueba()))
+      .mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' }))
+      .mockResolvedValueOnce(respuesta({ obligaciones: [obligacion] }))
+      .mockResolvedValue(respuesta({ historial: {
+        obligacion_id: 81, concepto: obligacion.concepto, monto_original: '100.00', total_abonado: '100.00', saldo_pendiente: '0.00',
+        estado_economico: 'PAGADO', resumen_consistente: true, advertencia: null,
+        abonos: [{ id: 8, monto: '100.00', medio_pago: 'Efectivo', fecha_registro: '2026-10-18T16:00:00.000Z', tiene_comprobante: false, puede_descargar_comprobante: false, url_comprobante: null }],
+      } }))
+    renderizarAplicacion()
+    const usuario = await completarInicioSesion()
+    await screen.findByText('Acceso habilitado.')
+    await usuario.click(screen.getByRole('button', { name: 'Consultar historial de pagos' }))
+    await screen.findByRole('option', { name: 'Servicio de limpieza — PAGADO' })
+    await usuario.selectOptions(screen.getByLabelText('Obligación a consultar'), '81')
+    expect(await screen.findByRole('list', { name: 'Historial de abonos' })).toHaveTextContent('Efectivo')
+    const llamada = fetch.mock.calls.find(([url]) => url.endsWith('/api/obligaciones/81/historial'))
+    expect(llamada[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
+    expect(fetch.mock.calls.slice(1).every(([, opciones]) => opciones.method === 'GET')).toBe(true)
+  })
+
+  it('vuelve al login cuando vence la sesión al consultar los abonos de una obligación', async () => {
+    fetch.mockResolvedValueOnce(respuesta(sesionPrueba()))
+      .mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' }))
+      .mockResolvedValueOnce(respuesta({ obligaciones: [{ id: 81, concepto: 'Limpieza', estado_economico: 'PARCIAL' }] }))
+      .mockResolvedValue(respuesta({ message: 'Sesión vencida.' }, 401))
+    renderizarAplicacion()
+    const usuario = await completarInicioSesion()
+    await screen.findByText('Acceso habilitado.')
+    await usuario.click(screen.getByRole('button', { name: 'Consultar historial de pagos' }))
+    await screen.findByRole('option', { name: 'Limpieza — PARCIAL' })
+    await usuario.selectOptions(screen.getByLabelText('Obligación a consultar'), '81')
+    expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
+    expect(fetch.mock.calls.at(-1)[0]).toMatch(/\/api\/obligaciones\/81\/historial$/)
+    expect(fetch.mock.calls.at(-1)[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
+  })
+
   it('cierra sesión en el servidor y vuelve al login', async () => {
     fetch.mockResolvedValueOnce(respuesta(sesionPrueba())).mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' })).mockResolvedValue(respuesta(null, 204))
     renderizarAplicacion()

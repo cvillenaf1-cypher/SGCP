@@ -1,9 +1,9 @@
 # SGCP-10 — HU-05 | Consulta real del historial de pagos
 
-Backend de solo lectura para la interfaz original de Quinde, integrada en main
-mediante PR #12. No modifica HistorialPagos.jsx, sus pruebas ni los ejemplos.
-No añade dependencias ni migraciones: usa obligaciones, abonos y comprobantes
-de las migraciones 002–004 existentes.
+Consulta de solo lectura integrada con HistorialPagos.jsx en el panel ASISTENTE.
+La pantalla muestra los abonos reales y sus comprobantes autorizados. No añade
+dependencias ni migraciones: usa obligaciones, abonos y comprobantes de las
+migraciones 002–004 existentes.
 
 ## Ruta y permisos
 
@@ -25,6 +25,7 @@ Ejemplo ilustrativo de una obligación con un abono parcial:
     "concepto": "Servicio de limpieza",
     "monto_original": "100.00",
     "saldo_pendiente": "90.00",
+    "saldo_pendiente_calculado": "90.00",
     "total_abonado": "10.00",
     "estado_economico": "PARCIAL",
     "resumen_consistente": true,
@@ -46,7 +47,7 @@ Ejemplo ilustrativo de una obligación con un abono parcial:
 
 - historial: objeto; obligacion_id e id: enteros.
 - concepto, medio_pago y estado_economico: cadenas.
-- monto_original, saldo_pendiente, total_abonado y monto: cadenas decimales en
+- monto_original, saldo_pendiente, saldo_pendiente_calculado, total_abonado y monto: cadenas decimales en
   soles con dos decimales. No convertir a Number para cálculos monetarios.
 - estado_economico conserva PENDIENTE/PARCIAL/PAGADO según el saldo real.
 - fecha_registro: cadena ISO UTC terminada en Z; puede contener milisegundos.
@@ -58,6 +59,11 @@ Ejemplo ilustrativo de una obligación con un abono parcial:
   no existe comprobante o el solicitante no tiene permiso de descarga.
 - resumen_consistente: booleano; advertencia: cadena o null.
 - abonos: arreglo completo en fecha_registro DESC, id DESC, sin duplicados.
+
+saldo_pendiente conserva el valor almacenado. saldo_pendiente_calculado es la
+diferencia exacta entre monto_original y total_abonado, calculada sin escrituras.
+La interfaz muestra este saldo calculado. Si los registros presentan un sobrepago
+inconsistente, la diferencia conserva el signo negativo y dos decimales.
 
 Sin abonos: abonos es [], total_abonado es "0.00", se conserva el monto y saldo
 almacenados y se verifica igualmente la consistencia. No se utiliza el historial
@@ -80,36 +86,21 @@ que existe un archivo sin ofrecer una descarga no autorizada. GERENTE conserva
 su consulta HU-04, pero no accede a este endpoint exclusivo del ASISTENTE.
 No se exponen UUID internos, rutas, nombres privados, claves idempotentes o hashes.
 
-## Adaptación a la presentación original de Quinde
+## Integración de la pantalla
 
-Documento de integración; no se aplica este cambio al frontend en esta entrega.
+HistorialPagos consume el contrato snake_case directamente desde la ruta de
+historial. Presenta el monto original, el total de abonos y su diferencia exacta
+como saldo pendiente. El cálculo de la pantalla también funciona con la versión
+anterior del endpoint, sin depender del nuevo campo aditivo.
 
-```javascript
-const { historial } = await solicitar('/api/obligaciones/' + identificador + '/historial')
-const presentacion = {
-  concepto: historial.concepto,
-  montoOriginal: historial.monto_original,
-  totalAbonado: historial.total_abonado,
-  saldoPendiente: historial.saldo_pendiente,
-  abonos: historial.abonos.map((abono) => ({
-    identificador: abono.id,
-    monto: abono.monto,
-    medioPago: abono.medio_pago,
-    fechaHora: abono.fecha_registro,
-    tieneComprobante: abono.tiene_comprobante,
-    puedeDescargarComprobante: abono.puede_descargar_comprobante,
-    urlComprobante: abono.url_comprobante,
-  })),
-}
-```
+La lista muestra fecha, importe y medio de pago en orden descendente sin mutar
+la respuesta. Actualizar historial conserva la obligación seleccionada y vuelve
+a leer los movimientos. Al volver desde el registro de abonos, la vista solicita
+el historial actualizado. No se cargan ejemplos ni se realizan escrituras.
 
-PresentacionHistorial ya recibe estos campos camelCase y formatea America/Lima.
-Al conectarla, Quinde debe reemplazar la consulta de detalle pendiente por esta
-ruta, mostrar advertencia si existe, distinguir comprobante de permiso, añadir
-la descarga autenticada y retirar el texto de ejemplo para datos reales.
-La API ya entrega el orden; el ordenamiento existente de la presentación es
-compatible. No cambiar ejemplos de demostración por datos supuestamente reales.
-La conexión visual permanece pendiente de revisión de Quinde.
+Ver comprobante obtiene el Blob por la ruta autenticada y muestra la imagen en
+la fila. Cerrar o cambiar de obligación cancela la solicitud y libera la URL
+temporal. Los pagos con adjunto sin permiso se indican sin solicitar el archivo.
 
 ## Consistencia y rendimiento
 
@@ -161,11 +152,13 @@ para probar inconsistencia pertenece únicamente a esa suite. La prueba concurre
 pausa un abono real antes del commit y consulta antes/después para verificar
 integridad sin bloqueos. No usa Docker ni recrea bases.
 
-La interfaz permanece sin conectar al endpoint real en esta entrega por
-instrucción de Haro; no se declara aprobado un recorrido visual de HU-05 real.
+Las pruebas sin MySQL están en historial.test.js, historial.ruta.test.js e
+historial.pagadas.ruta.test.js. Comprueban el contrato, cálculo exacto, permisos,
+solo lectura y conservación de pagos al añadir otro abono. La integración con
+MySQL requiere la configuración independiente de pruebas; no debe ejecutarse
+contra producción si backend/.env.test no está disponible.
 
-Resultados comprobados el 18/10/2026: npm test backend 90/90 (8 pruebas nuevas
-HU-05), check y lint backend aprobados; npm test frontend 120/120, lint y build
-frontend aprobados. No quedan pruebas backend obligatorias pendientes de MySQL.
-El recorrido E2E de la pantalla HU-05 conectada al historial sigue pendiente de la
-integración de Quinde; no se modificó esa pantalla ni se ejecutó ese recorrido.
+La configuración frontend/playwright.historial.config.js permite comprobar en
+navegador la pantalla y el cliente HTTP con respuestas API de prueba, sin MySQL.
+Incluye lista y resumen, comprobante autenticado, historial vacío, reintentos y
+un nuevo abono que se incorpora al volver a consultar sin alterar los anteriores.

@@ -53,6 +53,7 @@ test('historial: conserva los pagos de una obligacion pagada tras rechazar otro 
   const antes = await consultar()
   assert.equal(antes.body.historial.estado_economico, 'PAGADO')
   assert.equal(antes.body.historial.saldo_pendiente, '0.00')
+  assert.equal(antes.body.historial.saldo_pendiente_calculado, '0.00')
   assert.equal(antes.body.historial.total_abonado, '100.00')
   assert.equal(antes.body.historial.resumen_consistente, true)
   assert.deepEqual(antes.body.historial.abonos.map(({ id, monto }) => ({ id, monto })), [
