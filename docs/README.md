@@ -8,6 +8,7 @@
 - [SGCP-7, HU-02: consulta de obligaciones en el backend](SGCP-7-HU-02-backend.md).
 - [SGCP-8, HU-03: registro de pagos realizados en el backend](SGCP-8-HU-03-backend.md).
 - [SGCP-9, HU-04: comprobantes privados](SGCP-9-HU-04-comprobantes.md).
+- [SGCP-10, HU-05: contrato del historial real](SGCP-10-HU-05-historial.md).
 - [Capturas de evidencia](evidence/README.md).
 - [Migraciones y preparación MySQL](../database/README.md).
 - [Instalación y comandos](../README.md).

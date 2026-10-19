@@ -1,3 +1,4 @@
+import { consultarHistorial } from './historial/consulta.js'
 import { registrarRutasComprobantes } from './comprobantes/rutas.js'
 import { validarRegistroAbono } from './abonos/validacion.js'
 import { registrarAbono, ErrorAbono } from './abonos/servicio.js'
@@ -83,6 +84,15 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion,
       if (error instanceof ErrorAbono) return respuesta.status(error.estado).json({ message: error.message })
       throw error
     }
+  })
+
+
+  aplicacion.get('/api/obligaciones/:id/historial', requerirSesion, autorizar(ROLES.ASISTENTE), async (solicitud, respuesta) => {
+    const { id, fields: campos } = validarIdentificadorObligacion(solicitud.params.id)
+    if (Object.keys(campos).length) return respuesta.status(422).json({ message: 'Revisa el identificador de la obligación.', fields: campos })
+    const historial = await consultarHistorial(conexiones, id, solicitud.auth.user.id)
+    if (!historial) return respuesta.status(404).json({ message: 'Obligación no encontrada.' })
+    respuesta.json({ historial })
   })
 
   registrarRutasComprobantes(aplicacion, conexiones, requerirSesion, almacenComprobantes)
