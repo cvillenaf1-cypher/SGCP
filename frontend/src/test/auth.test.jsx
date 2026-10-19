@@ -16,7 +16,7 @@ async function completarInicioSesion() {
   const usuario = userEvent.setup()
   await usuario.type(screen.getByLabelText('Correo electrónico'), 'prueba@example.test')
   await usuario.type(screen.getByLabelText('Contraseña'), 'valor-solo-para-mock')
-  await usuario.click(screen.getByRole('button', { name: 'Ingresar' }))
+  await usuario.click(screen.getByRole('button', { name: /^Iniciar sesión/ }))
   return usuario
 }
 
@@ -32,7 +32,7 @@ describe('Acceso SGCP', () => {
 
   it('valida campos obligatorios antes de llamar a la API', async () => {
     renderizarAplicacion()
-    await userEvent.click(screen.getByRole('button', { name: 'Ingresar' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Iniciar sesión/ }))
     expect(screen.getByText('Ingresa un correo electrónico válido.')).toBeInTheDocument()
     expect(screen.getByLabelText('Contraseña')).toHaveAttribute('aria-invalid', 'true')
     expect(fetch).not.toHaveBeenCalled()
@@ -142,7 +142,7 @@ describe('Acceso SGCP', () => {
     renderizarAplicacion()
     await completarInicioSesion()
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo conectar con el servidor')
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Ingresar' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Iniciar sesión/ })).toBeEnabled())
   })
 
   it('al montar la aplicación nuevamente no recupera la sesión anterior', async () => {

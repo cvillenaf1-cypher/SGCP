@@ -186,7 +186,7 @@ describe('Protección de la ruta mensual con la autenticación existente', () =>
     const usuario = userEvent.setup()
     await usuario.type(screen.getByLabelText('Correo electrónico'), 'prueba@example.test')
     await usuario.type(screen.getByLabelText('Contraseña'), 'valor-ficticio-de-prueba')
-    await usuario.click(screen.getByRole('button', { name: 'Ingresar' }))
+    await usuario.click(screen.getByRole('button', { name: /^Iniciar sesión/ }))
     return usuario
   }
 
