@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FormularioPagoPendiente } from './FormularioPagoPendiente'
 import { ListadoPagosPendientes } from './ListadoPagosPendientes'
 import { FormularioAbono } from './FormularioAbono'
+import { HistorialPagos } from './HistorialPagos'
 
 export function FuncionesAsistente() {
   const [vista, establecerVista] = useState('registro')
@@ -10,7 +11,8 @@ export function FuncionesAsistente() {
       <button type="button" className="secondary-button" aria-pressed={vista === 'registro'} onClick={() => establecerVista('registro')}>Registrar pagos pendientes</button>
       <button type="button" className="secondary-button" aria-pressed={vista === 'consulta'} onClick={() => establecerVista('consulta')}>Consultar pagos pendientes</button>
       <button type="button" className="secondary-button" aria-pressed={vista === 'abonos'} onClick={() => establecerVista('abonos')}>Registrar pagos realizados</button>
+      <button type="button" className="secondary-button" aria-pressed={vista === 'historial'} onClick={() => establecerVista('historial')}>Consultar historial de pagos</button>
     </nav>
-    {vista === 'registro' ? <FormularioPagoPendiente /> : vista === 'consulta' ? <ListadoPagosPendientes /> : <FormularioAbono />}
+    {vista === 'registro' ? <FormularioPagoPendiente /> : vista === 'consulta' ? <ListadoPagosPendientes /> : vista === 'abonos' ? <FormularioAbono /> : <HistorialPagos />}
   </>
 }

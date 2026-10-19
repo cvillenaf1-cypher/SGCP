@@ -1,3 +1,5 @@
+import { consultarHistorial } from './historial/consulta.js'
+import { registrarRutasComprobantes } from './comprobantes/rutas.js'
 import { validarRegistroAbono } from './abonos/validacion.js'
 import { registrarAbono, ErrorAbono } from './abonos/servicio.js'
 import cors from 'cors'
@@ -12,7 +14,7 @@ import { validarObligacion } from './obligaciones/validacion.js'
 import { listarObligaciones, obtenerObligacion } from './obligaciones/consulta.js'
 import { validarFiltroConsulta, validarIdentificadorObligacion } from './obligaciones/validacion-consulta.js'
 
-export async function crearAplicacion({ pool: conexiones, config: configuracion }) {
+export async function crearAplicacion({ pool: conexiones, config: configuracion, almacenComprobantes }) {
   const aplicacion = express()
   const servicio = await crearServicioAutenticacion(conexiones, configuracion.sessionMinutes)
   const requerirSesion = autenticar(conexiones)
@@ -83,6 +85,17 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion 
       throw error
     }
   })
+
+
+  aplicacion.get('/api/obligaciones/:id/historial', requerirSesion, autorizar(ROLES.ASISTENTE), async (solicitud, respuesta) => {
+    const { id, fields: campos } = validarIdentificadorObligacion(solicitud.params.id)
+    if (Object.keys(campos).length) return respuesta.status(422).json({ message: 'Revisa el identificador de la obligación.', fields: campos })
+    const historial = await consultarHistorial(conexiones, id, solicitud.auth.user.id)
+    if (!historial) return respuesta.status(404).json({ message: 'Obligación no encontrada.' })
+    respuesta.json({ historial })
+  })
+
+  registrarRutasComprobantes(aplicacion, conexiones, requerirSesion, almacenComprobantes)
 
   // Paneles iniciales: permiten comprobar autorización real sin adelantar historias financieras.
   aplicacion.get('/api/panel/asistente', requerirSesion, autorizar(ROLES.ASISTENTE), (_solicitud, respuesta) => {
