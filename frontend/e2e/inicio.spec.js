@@ -81,6 +81,7 @@ async function preparar(pagina, { rol = 'ASISTENTE', fallarArchivo = false, sinO
 test('inicio automático del asistente, detalles por teclado y presentación móvil sin desbordamiento', async ({ page: pagina }) => {
   await preparar(pagina)
   const tabla = pagina.getByRole('table')
+  await expect(pagina.getByRole('button', { name: 'Registrar pagos realizados', exact: true })).toHaveCount(0)
   await expect(tabla.getByRole('row')).toHaveCount(5)
   await expect(tabla).toContainText('Deuda vencida de septiembre')
   await expect(tabla).toContainText('Obligación pagada del mes')

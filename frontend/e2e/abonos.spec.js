@@ -34,9 +34,8 @@ test('HU-03 registra abonos parciales y completos y actualiza el saldo real', as
   await pagina.getByLabel('Correo electrónico').fill(usuario.email)
   await pagina.getByLabel('Contraseña', { exact: true }).fill(usuario.password)
   await pagina.getByRole('button', { name: /^Iniciar sesión/ }).click()
-  await pagina.getByRole('button', { name: 'Registrar pagos realizados', exact: true }).click()
-  await expect(pagina.getByRole('option', { name: `${concepto} — S/ 120.50`, exact: true })).toBeAttached()
-  await pagina.getByLabel('Pago pendiente', { exact: true }).selectOption(String(identificador))
+  await pagina.getByRole('button', { name: `Ver detalles de ${concepto} (#${identificador})`, exact: true }).click()
+  await pagina.getByRole('dialog').getByRole('button', { name: 'Registrar pago', exact: true }).click()
   await expect(pagina.getByLabel('Monto del abono (S/)')).toBeVisible()
   const escrituras = []
   pagina.on('request', (solicitud) => {
@@ -52,13 +51,13 @@ test('HU-03 registra abonos parciales y completos y actualiza el saldo real', as
   await pagina.getByLabel('Monto del abono (S/)').fill('25.50')
   await pagina.getByRole('button', { name: 'Registrar abono' }).click()
   await expect(pagina.getByText('Abono registrado correctamente.')).toBeVisible()
-  await expect(pagina.getByText('S/ 95.00')).toBeVisible()
+  await expect(pagina.getByRole('dialog').locator('.inicio-resumen').getByText('S/ 95.00', { exact: true })).toBeVisible()
   await pagina.getByLabel('Monto del abono (S/)').fill('95.00')
   await pagina.getByLabel('Medio de pago', { exact: true }).selectOption('Transferencia bancaria')
   await pagina.getByRole('button', { name: 'Registrar abono' }).click()
   await expect(pagina.getByText('Abono registrado correctamente.')).toBeVisible()
-  await expect(pagina.getByText('PAGADO')).toBeVisible()
-  await expect(pagina.getByText('S/ 0.00')).toBeVisible()
+  await expect(pagina.getByRole('dialog').locator('.inicio-resumen').getByText('Pagado', { exact: true })).toBeVisible()
+  await expect(pagina.getByRole('dialog').locator('.inicio-resumen').getByText('S/ 0.00', { exact: true })).toBeVisible()
   expect(escrituras).toHaveLength(2)
   expect(escrituras[0].url).toContain(`/api/obligaciones/${identificador}/abonos`)
   expect(escrituras[0].body).toMatchObject({

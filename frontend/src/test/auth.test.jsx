@@ -111,14 +111,14 @@ describe('Acceso SGCP', () => {
     expect(llamada[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
   })
 
-  it('ASISTENTE abre HU-03 con sesión y consulta sus obligaciones con Bearer', async () => {
+  it('ASISTENTE consulta las obligaciones con Bearer sin un acceso duplicado para registrar pagos', async () => {
     simularSesion()
     renderizarAplicacion()
-    const usuario = await completarInicioSesion()
+    await completarInicioSesion()
     await screen.findByRole('heading', { name: 'Pagos del mes' })
-    await usuario.click(screen.getByRole('button', { name: 'Registrar pagos realizados' }))
-    expect(await screen.findByRole('heading', { name: 'Registrar pagos realizados' })).toBeInTheDocument()
-    await screen.findByText('Todavía no hay obligaciones registradas. Registra primero un pago pendiente.')
+    await screen.findByText('No hay obligaciones del mes ni deudas vencidas pendientes.')
+    expect(screen.queryByRole('button', { name: 'Registrar pagos realizados' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Consultar historial de pagos' })).toBeInTheDocument()
     const llamada = fetch.mock.calls.find(([url]) => url.endsWith('/api/obligaciones'))
     expect(llamada[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
     expect(fetch.mock.calls.filter(([, opciones]) => opciones.method === 'POST')).toHaveLength(1)

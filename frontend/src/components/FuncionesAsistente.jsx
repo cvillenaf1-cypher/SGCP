@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react'
 import { FormularioPagoPendiente } from './FormularioPagoPendiente'
 import { PagosInicio } from './PagosInicio'
-import { FormularioAbono } from './FormularioAbono'
 import { HistorialPagos } from './HistorialPagos'
 
 export function FuncionesAsistente({ alBloquear }) {
@@ -11,12 +10,11 @@ export function FuncionesAsistente({ alBloquear }) {
   return <>
     <nav className="consulta-navegacion" aria-label="Funciones del asistente">
       <button type="button" disabled={bloqueada} className="secondary-button" aria-pressed={vista === 'consulta'} onClick={() => establecerVista('consulta')}>Pagos del mes</button>
-      <button type="button" disabled={bloqueada} className="secondary-button" aria-pressed={vista === 'abonos'} onClick={() => establecerVista('abonos')}>Registrar pagos realizados</button>
       <button type="button" disabled={bloqueada} className="secondary-button" aria-pressed={vista === 'historial'} onClick={() => establecerVista('historial')}>Consultar historial de pagos</button>
     </nav>
     {vista === 'registro' ? <>
       <button type="button" className="secondary-button" onClick={() => establecerVista('consulta')}>Volver a pagos del mes</button>
       <FormularioPagoPendiente />
-    </> : vista === 'consulta' ? <PagosInicio puedeRegistrar alBloquear={bloquear} alNuevaDeuda={() => establecerVista('registro')} /> : vista === 'abonos' ? <FormularioAbono alBloquear={bloquear} /> : <HistorialPagos />}
+    </> : vista === 'consulta' ? <PagosInicio puedeRegistrar alBloquear={bloquear} alNuevaDeuda={() => establecerVista('registro')} /> : <HistorialPagos />}
   </>
 }

@@ -16,7 +16,7 @@ test.beforeEach(async ({ request: solicitudes }) => {
   concepto = `Integración HU-04 ${randomUUID()}`
   const respuesta = await solicitudes.post('http://127.0.0.1:3001/api/obligaciones', {
     headers: { Authorization: `Bearer ${sesion.token}` },
-    data: { concepto, beneficiario: 'Proveedor de prueba', monto: '40.00', fecha_limite: '2027-01-01' },
+    data: { concepto, beneficiario: 'Proveedor de prueba', monto: '40.00', fecha_limite: '2020-01-01' },
   })
   expect(respuesta.status()).toBe(201)
   obligacionId = (await respuesta.json()).obligacion.id
@@ -41,8 +41,8 @@ async function prepararPantalla(pagina, monto) {
   await pagina.getByLabel('Correo electrónico').fill(usuario.email)
   await pagina.getByLabel('Contraseña', { exact: true }).fill(usuario.password)
   await pagina.getByRole('button', { name: /^Iniciar sesión/ }).click()
-  await pagina.getByRole('button', { name: 'Registrar pagos realizados', exact: true }).click()
-  await pagina.getByLabel('Pago pendiente', { exact: true }).selectOption(String(obligacionId))
+  await pagina.getByRole('button', { name: `Ver detalles de ${concepto} (#${obligacionId})`, exact: true }).click()
+  await pagina.getByRole('dialog').getByRole('button', { name: 'Registrar pago', exact: true }).click()
   await pagina.getByLabel('Monto del abono (S/)').fill(monto)
   await pagina.getByLabel('Medio de pago', { exact: true }).selectOption('Efectivo')
   await pagina.getByLabel('Comprobante (opcional)').setInputFiles({ name: 'recibo.png', mimeType: 'image/png', buffer: imagen })
@@ -115,7 +115,7 @@ test('HU-04: respuesta de carga perdida y saldo cero no duplican abono ni compro
   await prepararPantalla(pagina, '40.00')
   await pagina.getByRole('button', { name: 'Registrar abono' }).click()
   await expect(pagina.getByText(/El abono ya está registrado.*Reintenta solo el comprobante/)).toBeVisible()
-  await expect(pagina.getByText('PAGADO', { exact: true })).toBeVisible()
+  await expect(pagina.getByRole('dialog').locator('.inicio-resumen').getByText('Pagado', { exact: true })).toBeVisible()
   await verificarPersistencia('0.00', 1)
   await pagina.getByRole('button', { name: 'Reintentar comprobante' }).click()
   await expect(pagina.getByText('Comprobante asociado correctamente.')).toBeVisible()
