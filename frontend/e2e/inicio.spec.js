@@ -2,10 +2,10 @@ import { expect, test } from '@playwright/test'
 
 const imagen = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==', 'base64')
 
-async function preparar(pagina, { rol = 'ASISTENTE', fallarArchivo = false } = {}) {
+async function preparar(pagina, { rol = 'ASISTENTE', fallarArchivo = false, sinObligaciones = false } = {}) {
   await pagina.clock.setFixedTime(new Date('2026-10-20T16:00:00Z'))
   const base = { beneficiario: 'Proveedor de prueba', monto_original: '100.00', saldo_pendiente: '100.00', fecha_limite: '2026-10-25', fecha_registro: '2026-09-01T15:00:00Z', estado_economico: 'PENDIENTE' }
-  const obligaciones = [
+  const obligaciones = sinObligaciones ? [] : [
     { ...base, id: 1, concepto: 'Servicio empresarial del mes' },
     { ...base, id: 2, concepto: 'Abono parcial del mes', saldo_pendiente: '30.00', estado_economico: 'PARCIAL' },
     { ...base, id: 3, concepto: 'Obligación pagada del mes', saldo_pendiente: '0.00', estado_economico: 'PAGADO' },
@@ -25,7 +25,18 @@ async function preparar(pagina, { rol = 'ASISTENTE', fallarArchivo = false } = {
     if (camino === '/api/auth/login') return responder({ token: 'sesion-simulada-inicio', expiresAt: '2026-10-21T16:00:00Z', user: { id: 1, name: `Usuario de prueba ${rol}`, role: rol } })
     expect(solicitud.headers().authorization).toBe('Bearer sesion-simulada-inicio')
     if (camino.startsWith('/api/panel/')) return responder({ message: 'Acceso de prueba habilitado.' })
-    if (camino === '/api/obligaciones') return responder({ obligaciones })
+    if (camino === '/api/obligaciones') {
+      if (metodo === 'POST') {
+        expect(rol).toBe('ASISTENTE')
+        const entrada = solicitud.postDataJSON()
+        const obligacion = { ...base, id: Math.max(0, ...obligaciones.map((fila) => fila.id)) + 1,
+          concepto: entrada.concepto, beneficiario: entrada.beneficiario, monto_original: entrada.monto,
+          saldo_pendiente: entrada.monto, fecha_limite: entrada.fecha_limite }
+        obligaciones.push(obligacion)
+        return responder({ obligacion }, 201)
+      }
+      return responder({ obligaciones })
+    }
     const archivo = camino.match(/^\/api\/abonos\/(\d+)\/comprobante\/archivo$/)
     if (archivo) return ruta.fulfill({ contentType: 'image/png', body: imagen })
     const comprobante = camino.match(/^\/api\/abonos\/(\d+)\/comprobante$/)
@@ -62,7 +73,8 @@ async function preparar(pagina, { rol = 'ASISTENTE', fallarArchivo = false } = {
   await pagina.getByLabel('Correo electrónico').fill('usuario@example.test')
   await pagina.getByLabel('Contraseña', { exact: true }).fill('clave-de-simulacion')
   await pagina.getByRole('button', { name: /^Iniciar sesión/ }).click()
-  await expect(pagina.getByRole('table')).toBeVisible()
+  if (sinObligaciones) await expect(pagina.getByRole('button', { name: 'Agregar nueva deuda' })).toBeVisible()
+  else await expect(pagina.getByRole('table')).toBeVisible()
   return { solicitudes, obligaciones }
 }
 
@@ -75,7 +87,11 @@ test('inicio automático del asistente, detalles por teclado y presentación mó
   await expect(pagina.getByText('Pagada antigua excluida')).toHaveCount(0)
   await expect(pagina.getByText('Obligación futura excluida')).toHaveCount(0)
   await expect(pagina.getByRole('combobox')).toHaveCount(0)
-  await expect(tabla.getByRole('button')).toHaveCount(4)
+  await expect(tabla.getByRole('button')).toHaveCount(5)
+  await expect(tabla.getByText('Pendiente', { exact: true }).first()).toBeVisible()
+  await expect(tabla.getByText('Parcial', { exact: true })).toBeVisible()
+  await expect(tabla.getByText('Vencida', { exact: true })).toBeVisible()
+  await expect(tabla.getByText(/con saldo|sin abonos|pendiente de cancelar/)).toHaveCount(0)
   await expect(tabla.getByRole('button', { name: /Registrar pago/ })).toHaveCount(0)
   await pagina.screenshot({ path: '.local/inicio-asistente-desktop.png', fullPage: true })
   const boton = tabla.getByRole('button', { name: /Ver detalles.*\(#1\)/ })
@@ -112,6 +128,7 @@ test('inicio automático del asistente, detalles por teclado y presentación mó
 test('el gerente inicia con la misma lista y consulta comprobantes sin controles de escritura', async ({ page: pagina }) => {
   const { solicitudes } = await preparar(pagina, { rol: 'GERENTE' })
   await expect(pagina.getByRole('button', { name: /Registrar pago/ })).toHaveCount(0)
+  await expect(pagina.getByRole('button', { name: 'Agregar nueva deuda' })).toHaveCount(0)
   await pagina.getByRole('button', { name: /Ver detalles.*\(#3\)/ }).click()
   const detalle = pagina.getByRole('dialog', { name: 'Detalle de la obligación #3' })
   await detalle.getByRole('button', { name: 'Ver comprobante', exact: true }).click()
@@ -173,3 +190,28 @@ test('cancelar una deuda antigua mantiene la confirmación y permite reintentar 
   await detalle.getByRole('button', { name: 'Cerrar detalles' }).click()
   await expect(pagina.getByRole('button', { name: 'Actualizar listado' })).toBeFocused()
 })
+
+for (const sinObligaciones of [false, true]) {
+  test(`el + permite registrar una deuda y volver al listado ${sinObligaciones ? 'vacío en móvil' : 'existente'}`, async ({ page: pagina }) => {
+    if (sinObligaciones) await pagina.setViewportSize({ width: 390, height: 844 })
+    const { solicitudes } = await preparar(pagina, { sinObligaciones })
+    await expect(pagina.getByRole('navigation', { name: 'Funciones del asistente' })
+      .getByRole('button', { name: 'Registrar pagos pendientes', exact: true })).toHaveCount(0)
+    await pagina.getByRole('button', { name: 'Agregar nueva deuda' }).click()
+    await pagina.getByLabel('Concepto del pago').fill('Nueva deuda del mes')
+    await pagina.getByLabel('Beneficiario', { exact: true }).fill('Proveedor nuevo')
+    await pagina.getByLabel('Monto original (S/)', { exact: true }).fill('150.50')
+    await pagina.getByLabel('Fecha límite', { exact: true }).fill('2026-10-30')
+    await pagina.getByRole('button', { name: 'Registrar pago pendiente', exact: true }).click()
+    await expect(pagina.getByText('Pago pendiente registrado correctamente.')).toBeVisible()
+    await pagina.getByRole('button', { name: 'Volver a pagos del mes' }).click()
+    const fila = pagina.getByRole('table').getByRole('row').filter({ hasText: 'Nueva deuda del mes' })
+    await expect(fila).toBeVisible()
+    await expect(fila.getByText('Pendiente', { exact: true })).toBeVisible()
+    await expect(fila.getByText('S/ 150.50', { exact: true })).toHaveCount(2)
+    expect(solicitudes.filter((entrada) => entrada.camino === '/api/obligaciones' && entrada.metodo === 'POST')).toEqual([
+      { camino: '/api/obligaciones', metodo: 'POST', cuerpo: { concepto: 'Nueva deuda del mes', beneficiario: 'Proveedor nuevo', monto: '150.50', fecha_limite: '2026-10-30' } },
+    ])
+    expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
+}

@@ -20,6 +20,10 @@
 .inicio-tabla-contenedor { max-width: 100%; overflow-x: auto; border: 1px solid #ccd9e3; border-radius: 16px; background: #fff; }
 .inicio-tabla { width: 100%; border-collapse: collapse; font-size: 1rem; }
 .inicio-tabla caption { padding: 16px; text-align: left; color: #43586d; }
+.inicio-tabla-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.inicio-tabla-herramientas { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.inicio-nueva-deuda { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 48px; height: 48px; padding: 0; color: #fff; background: #006b50; }
+.inicio-nueva-deuda:hover:not(:disabled) { background: #00503c; }
 .inicio-tabla th, .inicio-tabla td { padding: 16px 12px; text-align: left; vertical-align: top; border-top: 1px solid #dce5ed; }
 .inicio-tabla thead { background: #eaf1f6; color: #173851; }
 .inicio-tabla th[scope='row'], .inicio-tabla td:nth-child(2) { min-width: 130px; max-width: 260px; overflow-wrap: anywhere; }

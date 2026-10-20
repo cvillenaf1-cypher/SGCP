@@ -12,6 +12,7 @@ de `America/Lima` y la fecha de vencimiento, sin filtros superiores.
 - Ordena vencidas, pendientes/parciales del mes y pagadas; desempata por fecha e ID.
 - Muestra concepto, beneficiario, importe original, saldo, vencimiento y estado.
 - Conserva el estado económico y muestra el vencimiento como condición adicional.
+- Las etiquetas muestran solo Pendiente, Parcial, Pagado o Vencida, sin explicaciones añadidas.
 - Actualiza el período al cambiar el día en Lima, también al recuperar el foco.
 
 Cada fila tiene un único botón **Ver detalles**, que abre una ventana modal con
@@ -21,6 +22,12 @@ su botón o Escape; devuelve el foco
 al botón de origen o a **Actualizar listado** si la fila ya no está visible.
 
 ## Pagos y comprobantes
+
+El asistente registra nuevas deudas desde el icono **+** en la esquina superior
+derecha de la tabla. También está disponible cuando todavía no hay obligaciones.
+Abre el formulario existente de pago pendiente; **Volver a pagos del mes** recarga
+el listado para mostrar los registros del período. Este acceso reemplaza el botón
+de registro de pagos pendientes del menú. El gerente no dispone de este control.
 
 En la cabecera del detalle, junto al título y al cierre, el asistente puede pulsar
 **Registrar pago** si queda saldo pendiente. El formulario se abre en la parte
