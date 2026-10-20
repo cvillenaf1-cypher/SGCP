@@ -33,8 +33,12 @@ function preparar({ obligaciones = datos, puedeRegistrar = true, registrar, carg
     const fila = filas.find((entrada) => entrada.id === identificador)
     if (ruta.endsWith('/historial')) {
       const total = (Number(fila.monto_original) - Number(fila.saldo_pendiente)).toFixed(2)
-      return { historial: { obligacion_id: fila.id, concepto: fila.concepto, monto_original: fila.monto_original, saldo_pendiente: fila.saldo_pendiente,
-        total_abonado: total, resumen_consistente: true, abonos: abonos.filter((abono) => abono.obligacion_id === fila.id) } }
+      return {
+        historial: {
+          obligacion_id: fila.id, concepto: fila.concepto, monto_original: fila.monto_original, saldo_pendiente: fila.saldo_pendiente,
+          total_abonado: total, resumen_consistente: true, abonos: abonos.filter((abono) => abono.obligacion_id === fila.id)
+        }
+      }
     }
     if (ruta.endsWith('/abonos') && opciones.method === 'POST') {
       const resultado = registrar ? await registrar(opciones.body) : { abono: { id: 50, obligacion_id: fila.id, saldo_resultante: (Number(fila.saldo_pendiente) - Number(opciones.body.monto)).toFixed(2) } }
@@ -158,7 +162,11 @@ describe('Registro directo y comprobantes', () => {
     await completar()
     expect(screen.queryByLabelText('Pago pendiente')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
-    expect(await screen.findByText('Abono registrado correctamente.')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        screen.getByText('Abono registrado correctamente.')
+      ).toBeInTheDocument()
+    })
     const fila = within(screen.getByRole('table')).getByRole('row', { name: /Servicio de internet/ })
     await waitFor(() => expect(fila).toHaveTextContent('S/ 75.00'))
     expect(fila).toHaveTextContent('Parcial · con saldo')
@@ -183,7 +191,11 @@ describe('Registro directo y comprobantes', () => {
     const panel = await abrir(4)
     await completar('20.00')
     fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
-    expect(await within(panel).findByText('Abono registrado correctamente.')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        within(panel).getByText('Abono registrado correctamente.')
+      ).toBeInTheDocument()
+    })
     await waitFor(() => expect(screen.queryByRole('table')).not.toBeInTheDocument())
     expect(within(panel).getByRole('list', { name: 'Historial de abonos' })).toHaveTextContent('S/ 20.00')
     fireEvent.click(within(panel).getByRole('button', { name: 'Cerrar detalles' }))

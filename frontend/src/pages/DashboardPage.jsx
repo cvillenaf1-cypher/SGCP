@@ -20,7 +20,6 @@ export function PaginaPanel({ role: rol, alBloquear }) {
     <section className="inicio-compartido" aria-labelledby="dashboard-title">
       <div className="panel-heading">
         <h2 id="dashboard-title">Panel de {esAsistente ? 'asistente' : 'gerente'}</h2>
-        {!esAsistente && <span className="badge">Solo lectura</span>}
       </div>
       {estado.cargando && <p role="status">Verificando acceso con el servidor…</p>}
       {estado.error && <p className="error-message" role="alert">{estado.error}</p>}

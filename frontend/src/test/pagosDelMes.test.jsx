@@ -170,7 +170,7 @@ describe('HU-06: consulta mensual de solo lectura', () => {
   it('no presenta controles para registrar, editar, eliminar ni realizar pagos', async () => {
     renderizarConsulta()
     await screen.findByRole('table')
-    expect(screen.getByText('Solo lectura')).toBeInTheDocument()
+    expect(screen.queryByText('Solo lectura')).not.toBeInTheDocument()
     expect(
       screen.getAllByRole('button').every(
         (boton) => boton.classList.contains('boton-anio')
