@@ -192,6 +192,11 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, a
     destino?.focus()
   }
 
+  function volverAlMesActual() {
+    establecerHoy(fechaActualLima())
+    establecerMesElegido(null)
+  }
+
   const periodoActual = hoy.slice(0, 7)
   const mes = mesElegido?.periodo === periodoActual ? mesElegido.mes : hoy.slice(5, 7)
   const obligaciones = seleccionarPagosInicio(consulta.obligaciones, hoy, mes)
@@ -203,10 +208,12 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, a
   </button>
   return <section className="pagos-inicio" aria-labelledby="titulo-pagos-inicio">
     <div className="inicio-encabezado">
-      <div><select className="inicio-periodo" aria-label="Mes de los pagos" value={mes} disabled={bloqueada}
+      <div><div className="inicio-periodo-controles"><select className="inicio-periodo" aria-label="Mes de los pagos" value={mes} disabled={bloqueada}
         onChange={(evento) => establecerMesElegido({ periodo: periodoActual, mes: evento.target.value })}>
         {meses.map((nombre, indice) => <option key={nombre} value={String(indice + 1).padStart(2, '0')}>{nombre}</option>)}
-      </select><h3 id="titulo-pagos-inicio">Pagos del mes</h3>
+      </select>
+        <button type="button" className="secondary-button" disabled={bloqueada} onClick={volverAlMesActual}>Volver al mes actual</button>
+      </div><h3 id="titulo-pagos-inicio">Pagos del mes</h3>
         <p>Consulta las obligaciones del mes. En el mes actual también aparecen las deudas vencidas pendientes.</p></div>
       <button ref={botonActualizar} type="button" className="secondary-button" disabled={consulta.cargando || bloqueada} onClick={actualizarListado}>Actualizar listado</button>
     </div>

@@ -213,10 +213,16 @@ test('el selector de meses actualiza la tabla sin año ni recarga y permite cons
   await mes.selectOption('01')
   await expect(pagina.getByText('No hay obligaciones para el mes seleccionado.')).toBeVisible()
   await expect(pagina.getByRole('button', { name: 'Agregar nueva deuda' })).toBeVisible()
-  await mes.selectOption('10')
+  await pagina.getByRole('button', { name: 'Volver al mes actual', exact: true }).click()
+  await expect(mes).toHaveValue('10')
   await expect(pagina.getByRole('table')).toContainText('Obligación pagada del mes')
   await expect(pagina.getByRole('table')).toContainText('Deuda vencida de septiembre')
   expect(solicitudes.filter((entrada) => entrada.camino === '/api/obligaciones')).toHaveLength(lecturas)
+  await pagina.setViewportSize({ width: 390, height: 844 })
+  await mes.selectOption('09')
+  await pagina.getByRole('button', { name: 'Volver al mes actual', exact: true }).click()
+  await expect(mes).toHaveValue('10')
+  expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
 for (const sinObligaciones of [false, true]) {
