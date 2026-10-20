@@ -22,9 +22,10 @@ al botón de origen o a **Actualizar listado** si la fila ya no está visible.
 
 ## Pagos y comprobantes
 
-Dentro del detalle, el asistente puede pulsar **Registrar pago** si queda saldo
-pendiente y usar directamente el formulario
-existente: monto, medio de pago y comprobante opcional. No vuelve a seleccionar
+En la cabecera del detalle, junto al título y al cierre, el asistente puede pulsar
+**Registrar pago** si queda saldo pendiente. El formulario se abre en la parte
+superior de la ventana, antes del resumen y el historial, con los campos existentes:
+monto, medio de pago y comprobante opcional. No vuelve a seleccionar
 la obligación. Se conserva el endpoint monetario, la validación de céntimos,
 la transacción del backend y la clave de idempotencia durante un reintento.
 El formulario indica el saldo máximo a abonar y rechaza un importe superior,

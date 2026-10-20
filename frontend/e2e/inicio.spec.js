@@ -86,6 +86,7 @@ test('inicio automático del asistente, detalles por teclado y presentación mó
   expect(await detalle.evaluate((elemento) => elemento.matches(':modal'))).toBe(true)
   await expect(detalle.getByLabel('Monto del abono (S/)')).toHaveCount(0)
   await expect(detalle.getByRole('button', { name: 'Registrar pago', exact: true })).toBeVisible()
+  await expect(detalle.getByRole('button', { name: 'Registrar pago', exact: true })).toBeInViewport()
   await pagina.screenshot({ path: '.local/inicio-detalle-desktop.png' })
   for (let indice = 0; indice < 6; indice++) {
     await pagina.keyboard.press('Tab')
@@ -97,6 +98,7 @@ test('inicio automático del asistente, detalles por teclado y presentación mó
   await pagina.setViewportSize({ width: 390, height: 844 })
   expect((await tabla.locator('caption').boundingBox()).width).toBeGreaterThan(300)
   await tabla.getByRole('button', { name: /Ver detalles.*\(#1\)/ }).click()
+  await expect(detalle.getByRole('button', { name: 'Registrar pago', exact: true })).toBeInViewport()
   await pagina.screenshot({ path: '.local/inicio-detalle-mobile.png' })
   await detalle.getByRole('button', { name: 'Registrar pago', exact: true }).click()
   await expect(detalle.getByLabel('Medio de pago', { exact: true })).toBeVisible()

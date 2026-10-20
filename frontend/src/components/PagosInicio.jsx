@@ -26,6 +26,7 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
   const [mostrarRegistro, establecerMostrarRegistro] = useState(false)
   const dialogo = useRef(null)
   const titulo = useRef(null)
+  const tituloRegistro = useRef(null)
 
   useEffect(() => {
     const ventana = dialogo.current
@@ -38,6 +39,10 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
       document.body.style.overflow = desbordamientoAnterior
     }
   }, [])
+
+  useEffect(() => {
+    if (mostrarRegistro) tituloRegistro.current?.focus()
+  }, [mostrarRegistro])
 
   useEffect(() => {
     const controlador = new AbortController()
@@ -95,7 +100,11 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
     }}>
     <div className="inicio-detalle-encabezado">
       <h3 ref={titulo} tabIndex={-1} id="titulo-detalle-inicio">Detalle de la obligación #{identificador}</h3>
-      <button type="button" className="secondary-button" disabled={bloqueada} onClick={cerrar}>Cerrar detalles</button>
+      <div className="inicio-detalle-acciones">
+        {puedeRegistrar && obligacion && convertirACentimos(obligacion.saldo_pendiente) > 0n && !mostrarRegistro &&
+          <button type="button" className="inicio-boton-registrar" disabled={bloqueada} onClick={() => establecerMostrarRegistro(true)}>Registrar pago</button>}
+        <button type="button" className="secondary-button" disabled={bloqueada} onClick={cerrar}>Cerrar detalles</button>
+      </div>
     </div>
     {bloqueada && <p className="notice" role="status">Hay un registro o una confirmación pendiente. Resuélvelo antes de cerrar el detalle.</p>}
     {consulta.cargando && <p role="status">Cargando detalle…</p>}
@@ -104,6 +113,12 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
       <button type="button" onClick={() => { establecerConsulta((actual) => ({ ...actual, cargando: true, error: '' })); establecerIntento((actual) => actual + 1) }}>Reintentar detalle</button>
     </>}
     {obligacion && <>
+      {puedeRegistrar && mostrarRegistro && <section className="inicio-registro" aria-labelledby="titulo-pago-directo">
+        <h4 ref={tituloRegistro} tabIndex={-1} id="titulo-pago-directo">Registrar pago realizado</h4>
+        {convertirACentimos(obligacion.saldo_pendiente) > 0n && <p>Puedes abonar una parte o cancelar el saldo restante. El importe no puede superar {formatearImporte(obligacion.saldo_pendiente)}.</p>}
+        <DatosObligacionAbono identificador={identificador} alBloquear={bloquear} alActualizarObligacion={actualizarObligacion}
+          alRegistrar={actualizarTrasRegistro} mostrarResumen={false} />
+      </section>}
       <dl className="inicio-resumen">
         <div><dt>Concepto</dt><dd>{obligacion.concepto}</dd></div>
         <div><dt>Beneficiario</dt><dd>{obligacion.beneficiario}</dd></div>
@@ -115,13 +130,6 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
       <h4 className="inicio-titulo-historial">Pagos y comprobantes</h4>
       <ConsultaHistorialObligacion identificador={identificador} actualizacion={versionHistorial} />
       {obligacion.estado_economico === 'PAGADO' && !mostrarRegistro && <p className="notice">Esta obligación ya está pagada. Puedes consultar sus pagos y comprobantes.</p>}
-      {puedeRegistrar && (convertirACentimos(obligacion.saldo_pendiente) > 0n || mostrarRegistro) && <section className="inicio-registro" aria-labelledby="titulo-pago-directo">
-        <h4 id="titulo-pago-directo">Registrar pago realizado</h4>
-        {convertirACentimos(obligacion.saldo_pendiente) > 0n && <p>Puedes abonar una parte o cancelar el saldo restante. El importe no puede superar {formatearImporte(obligacion.saldo_pendiente)}.</p>}
-        {mostrarRegistro ? <DatosObligacionAbono identificador={identificador} alBloquear={bloquear} alActualizarObligacion={actualizarObligacion}
-          alRegistrar={actualizarTrasRegistro} mostrarResumen={false} />
-          : <button type="button" onClick={() => establecerMostrarRegistro(true)}>Registrar pago</button>}
-      </section>}
     </>}
   </dialog>
 }
