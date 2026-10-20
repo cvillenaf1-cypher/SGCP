@@ -16,6 +16,8 @@ diciembre, sin selector de año. Se usa el año actual del calendario de
   arrastrarse a octubre y se conserva como pagada en septiembre.
 - Los meses seleccionados que no sean el actual muestran solo sus obligaciones.
 - Elegir un mes actualiza la tabla inmediatamente, sin pulsar Actualizar listado.
+- **Volver al mes actual**, junto al selector, restablece el período actual de Lima
+  con un clic y muestra sus obligaciones y las vencidas pendientes.
 - Ordena vencidas, pendientes/parciales del mes y pagadas; desempata por fecha e ID.
 - Muestra concepto, beneficiario, importe original, saldo, vencimiento y estado.
 - Conserva el estado económico y muestra el vencimiento como condición adicional.
