@@ -7,10 +7,10 @@ async function iniciarSesion(pagina, rol) {
   await pagina.getByLabel('Correo electrónico').fill(usuario.email)
   await pagina.getByLabel('Contraseña').fill(usuario.password)
   const respuesta = pagina.waitForResponse((entrada) => entrada.url().endsWith('/api/auth/login') && entrada.status() === 200)
-  await pagina.getByRole('button', { name: 'Ingresar' }).click()
+  await pagina.getByRole('button', { name: /^Iniciar sesión/ }).click()
   const sesion = await (await respuesta).json()
   await expect(pagina.getByRole('heading', { name: `Panel de ${rol === 'ASISTENTE' ? 'asistente' : 'gerente'}` })).toBeVisible()
-  await expect(pagina.getByRole('status')).toContainText('Acceso de')
+  await expect(pagina.getByRole('heading', { name: 'Pagos del mes', exact: true })).toBeVisible()
   return sesion
 }
 
@@ -18,7 +18,7 @@ test('ruta privada sin sesión lleva al login y presenta validaciones', async ({
   await pagina.goto('/#/gerente')
   await expect(pagina).toHaveURL(/#\/login$/)
   await pagina.screenshot({ path: fileURLToPath(new URL('../../docs/evidence/SGCP-1-login.png', import.meta.url)), fullPage: true })
-  await pagina.getByRole('button', { name: 'Ingresar' }).click()
+  await pagina.getByRole('button', { name: /^Iniciar sesión/ }).click()
   await expect(pagina.getByText('Ingresa un correo electrónico válido.')).toBeVisible()
 })
 

@@ -28,6 +28,17 @@ test('historial: inexistente no inventa una obligación ni movimientos', async (
   assert.equal(pool.execute.mock.callCount(), 1)
 })
 
+test('historial: GERENTE puede consultar comprobantes de otros registradores sin modificar datos', async () => {
+  const filas = movimientos.map((abono) => ({ ...obligacion, ...abono }))
+  const copia = structuredClone(filas)
+  const pool = poolLectura(filas)
+  const historial = await consultarHistorial(pool, 81, 99, 'GERENTE')
+  assert.ok(historial.abonos.every((abono) => abono.puede_descargar_comprobante))
+  assert.deepEqual(historial.abonos.map((abono) => abono.url_comprobante), ['/api/abonos/12/comprobante/archivo', '/api/abonos/11/comprobante/archivo'])
+  assert.deepEqual(filas, copia)
+  assert.equal(pool.execute.mock.callCount(), 1)
+})
+
 test('historial: sin abonos devuelve resumen original y lista vacía real', async () => {
   const fila = { ...obligacion, saldo_pendiente: '100.00', abono_id: null }
   const pool = poolLectura([fila])

@@ -27,33 +27,22 @@ test.afterAll(async () => {
   } finally { await conexiones.end() }
 })
 
-test('ASISTENTE consulta obligaciones reales, filtra, abre detalle y conserva la vista móvil', async ({ page: pagina }) => {
+test('ASISTENTE ve automáticamente una deuda vencida real, abre detalle y conserva la vista móvil', async ({ page: pagina }) => {
   await pagina.goto('/#/login')
   await pagina.getByLabel('Correo electrónico').fill(usuario.email)
   await pagina.getByLabel('Contraseña', { exact: true }).fill(usuario.password)
-  await pagina.getByRole('button', { name: 'Ingresar' }).click()
-  await pagina.getByRole('button', { name: 'Consultar pagos pendientes', exact: true }).click()
-  const fila = pagina.getByRole('row').filter({ has: pagina.getByRole('rowheader', { name: concepto, exact: true }) })
+  await pagina.getByRole('button', { name: /^Iniciar sesión/ }).click()
+  const fila = pagina.getByRole('row').filter({ hasText: concepto })
   await expect(fila).toBeVisible()
-  await expect(fila.getByText('Pendiente', { exact: true })).toBeVisible()
-  await expect(fila.getByText('Vencida', { exact: true })).toBeVisible()
+  await expect(fila.getByText('Pendiente · sin abonos', { exact: true })).toBeVisible()
+  await expect(fila.getByText('Vencida · pendiente de cancelar', { exact: true })).toBeVisible()
   await expect(fila.getByText('S/ 120.50', { exact: true })).toHaveCount(2)
-  await fila.getByRole('button', { name: `Ver detalle de ${concepto}`, exact: true }).click()
-  const detalle = pagina.getByRole('region', { name: 'Detalle del pago seleccionado' })
+  await fila.getByRole('button', { name: `Ver detalles de ${concepto} (#${identificador})`, exact: true }).click()
+  const detalle = pagina.getByRole('region', { name: `Detalle de la obligación #${identificador}` })
   await expect(detalle.getByText(concepto, { exact: true })).toBeVisible()
   await expect(detalle.getByText('15/01/2020', { exact: true })).toBeVisible()
-  for (const filtro of ['pendiente', 'vencido']) {
-    await pagina.getByLabel('Filtrar pagos').selectOption(filtro)
-    await expect(fila).toBeVisible()
-  }
-  for (const filtro of ['parcial', 'pagado']) {
-    await pagina.getByLabel('Filtrar pagos').selectOption(filtro)
-    await expect(pagina.getByText('Cargando pagos pendientes…')).toBeHidden()
-    await expect(fila).toHaveCount(0)
-  }
-  await pagina.getByLabel('Filtrar pagos').selectOption('')
-  await expect(fila).toBeVisible()
+  await expect(pagina.getByLabel('Filtrar pagos')).toHaveCount(0)
   await pagina.setViewportSize({ width: 390, height: 844 })
-  await expect(pagina.getByLabel('Filtrar pagos')).toBeVisible()
+  await expect(fila).toBeVisible()
   expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })

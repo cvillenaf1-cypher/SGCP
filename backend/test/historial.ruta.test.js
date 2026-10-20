@@ -69,7 +69,9 @@ test('historial ruta: conserva autenticación, rol, validación y obligación in
   const inexistente = await asistente.consultar().expect(404)
   assert.equal(inexistente.body.message, 'Obligación no encontrada.')
   const gerente = await prepararEscenario({ rol: 'GERENTE' })
-  await gerente.consultar().expect(403)
+  await gerente.consultar().expect(200)
+  await request(gerente.aplicacion).post('/api/obligaciones/81/abonos').auth(token, { type: 'bearer' }).send({ monto: '30.00' }).expect(403)
+  assert.ok(gerente.ejecutar.mock.calls.every(({ arguments: [sql] }) => /^SELECT\s/.test(sql.trimStart())))
 })
 
 test('historial ruta: sin pagos entrega una lista vacía y resumen real sin escrituras', async () => {

@@ -65,7 +65,7 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion,
     respuesta.json({ obligaciones })
   })
 
-  aplicacion.get('/api/obligaciones/:id', requerirSesion, autorizar(ROLES.ASISTENTE), async (solicitud, respuesta) => {
+  aplicacion.get('/api/obligaciones/:id', requerirSesion, autorizar(ROLES.ASISTENTE, ROLES.GERENTE), async (solicitud, respuesta) => {
     const { id, fields: campos } = validarIdentificadorObligacion(solicitud.params.id)
     if (Object.keys(campos).length) return respuesta.status(422).json({ message: 'Revisa los datos de la consulta.', fields: campos })
     const obligacion = await obtenerObligacion(conexiones, id)
@@ -87,10 +87,10 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion,
   })
 
 
-  aplicacion.get('/api/obligaciones/:id/historial', requerirSesion, autorizar(ROLES.ASISTENTE), async (solicitud, respuesta) => {
+  aplicacion.get('/api/obligaciones/:id/historial', requerirSesion, autorizar(ROLES.ASISTENTE, ROLES.GERENTE), async (solicitud, respuesta) => {
     const { id, fields: campos } = validarIdentificadorObligacion(solicitud.params.id)
     if (Object.keys(campos).length) return respuesta.status(422).json({ message: 'Revisa el identificador de la obligación.', fields: campos })
-    const historial = await consultarHistorial(conexiones, id, solicitud.auth.user.id)
+    const historial = await consultarHistorial(conexiones, id, solicitud.auth.user.id, solicitud.auth.user.role)
     if (!historial) return respuesta.status(404).json({ message: 'Obligación no encontrada.' })
     respuesta.json({ historial })
   })
