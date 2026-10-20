@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { leerAbono, adjuntarEvidencia } from './support/comprobante.js'
 
 const imagen = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==', 'base64')
 
@@ -20,7 +21,7 @@ async function preparar(pagina, { rol = 'ASISTENTE', fallarArchivo = false, sinO
     const solicitud = ruta.request()
     const camino = new URL(solicitud.url()).pathname
     const metodo = solicitud.method()
-    solicitudes.push({ camino, metodo, cuerpo: metodo === 'POST' && !camino.includes('/comprobante') ? solicitud.postDataJSON() : null })
+    solicitudes.push({ camino, metodo, cuerpo: metodo === 'POST' && !camino.includes('/comprobante') ? (camino.endsWith('/abonos') ? leerAbono(solicitud) : solicitud.postDataJSON()) : null })
     const responder = (datos, status = 200) => ruta.fulfill({ status, contentType: 'application/json', body: JSON.stringify(datos) })
     if (camino === '/api/auth/login') return responder({ token: 'sesion-simulada-inicio', expiresAt: '2026-10-21T16:00:00Z', user: { id: 1, name: `Usuario de prueba ${rol}`, role: rol } })
     expect(solicitud.headers().authorization).toBe('Bearer sesion-simulada-inicio')
@@ -59,13 +60,15 @@ async function preparar(pagina, { rol = 'ASISTENTE', fallarArchivo = false, sinO
     } })
     if (camino.endsWith('/abonos')) {
       expect(rol).toBe('ASISTENTE')
-      const entrada = solicitud.postDataJSON()
+      const entrada = leerAbono(solicitud)
+      cargas++
+      if (fallarArchivo && cargas === 1) return responder({ message: 'Carga de comprobante no disponible.' }, 503)
       obligacion.saldo_pendiente = (Number(obligacion.saldo_pendiente) - Number(entrada.monto)).toFixed(2)
       obligacion.estado_economico = obligacion.saldo_pendiente === '0.00' ? 'PAGADO' : 'PARCIAL'
       const abono = { id: 50 + abonos.length, obligacion_id: identificador, monto: entrada.monto, medio_pago: entrada.medio_pago, saldo_resultante: obligacion.saldo_pendiente,
-        fecha_registro: '2026-10-20T16:00:00Z', tiene_comprobante: false, puede_descargar_comprobante: false }
+        fecha_registro: '2026-10-20T16:00:00Z', tiene_comprobante: true, puede_descargar_comprobante: true }
       abonos.push(abono)
-      return responder({ message: 'Abono registrado correctamente.', abono }, 201)
+      return responder({ message: 'Abono registrado correctamente.', abono, comprobante: { abono_id: abono.id, nombre: 'recibo.png', tipo: 'image/png' } }, 201)
     }
     return responder({ obligacion })
   })
@@ -147,17 +150,20 @@ test('pago parcial y completo actualizan el mismo panel y conservan la obligaci�
   await detalle.getByRole('button', { name: 'Registrar pago', exact: true }).click()
   await detalle.getByLabel('Monto del abono (S/)').fill('25.00')
   await detalle.getByLabel('Medio de pago', { exact: true }).selectOption('Efectivo')
+  await adjuntarEvidencia(pagina)
   await detalle.getByRole('button', { name: 'Registrar abono' }).click()
   await expect(detalle.getByText('Abono registrado correctamente.')).toBeVisible()
   await expect(pagina.locator('table tbody tr').filter({ hasText: 'Servicio empresarial del mes' })).toContainText('S/ 75.00')
   await expect(detalle.getByRole('list', { name: 'Historial de abonos' })).toContainText('S/ 25.00')
   await detalle.getByLabel('Monto del abono (S/)').fill('75.01')
   await detalle.getByLabel('Medio de pago', { exact: true }).selectOption('Transferencia bancaria')
+  await adjuntarEvidencia(pagina)
   await detalle.getByRole('button', { name: 'Registrar abono' }).click()
   await expect(detalle.getByText('El abono no puede superar el saldo pendiente.')).toBeVisible()
   expect(solicitudes.filter((entrada) => entrada.camino.endsWith('/abonos'))).toHaveLength(1)
   await detalle.getByLabel('Monto del abono (S/)').fill('75.00')
   await detalle.getByLabel('Medio de pago', { exact: true }).selectOption('Transferencia bancaria')
+  await adjuntarEvidencia(pagina)
   await detalle.getByRole('button', { name: 'Registrar abono' }).click()
   await expect(detalle.getByText(/Esta obligación ya está pagada/)).toBeVisible()
   await expect(pagina.locator('table tbody tr').filter({ hasText: 'Servicio empresarial del mes' })).toContainText('Pagado')
@@ -169,7 +175,7 @@ test('pago parcial y completo actualizan el mismo panel y conservan la obligaci�
   expect(envios[0].cuerpo.clave_idempotencia).not.toBe(envios[1].cuerpo.clave_idempotencia)
 })
 
-test('cancelar una deuda antigua mantiene la confirmación y permite reintentar solo el comprobante', async ({ page: pagina }) => {
+test('cancelar una deuda antigua reintenta el pago completo con su evidencia', async ({ page: pagina }) => {
   const { solicitudes } = await preparar(pagina, { fallarArchivo: true })
   await pagina.getByRole('combobox', { name: 'Mes de los pagos' }).selectOption('09')
   await pagina.getByRole('button', { name: /Ver detalles.*\(#4\)/ }).click()
@@ -177,19 +183,20 @@ test('cancelar una deuda antigua mantiene la confirmación y permite reintentar 
   await detalle.getByRole('button', { name: 'Registrar pago', exact: true }).click()
   await detalle.getByLabel('Monto del abono (S/)').fill('100.00')
   await detalle.getByLabel('Medio de pago', { exact: true }).selectOption('Efectivo')
-  await detalle.getByLabel('Comprobante (opcional)').setInputFiles({ name: 'recibo.png', mimeType: 'image/png', buffer: imagen })
+  await detalle.getByLabel('Comprobante o factura (obligatorio)').setInputFiles({ name: 'recibo.png', mimeType: 'image/png', buffer: imagen })
+  await adjuntarEvidencia(pagina)
   await detalle.getByRole('button', { name: 'Registrar abono' }).click()
-  await expect(detalle.getByText('Abono registrado correctamente.')).toBeVisible()
-  await expect(detalle.getByText(/El abono ya está registrado. Reintenta solo el comprobante/)).toBeVisible()
-  await expect(pagina.locator('table tbody tr').filter({ hasText: 'Deuda vencida de septiembre' })).toContainText('Pagado')
+  await expect(detalle.getByText(/Carga de comprobante no disponible/)).toBeVisible()
+  await expect(detalle.getByText('Abono registrado correctamente.')).toHaveCount(0)
+  await expect(pagina.locator('table tbody tr').filter({ hasText: 'Deuda vencida de septiembre' })).toContainText('Pendiente')
   await expect(detalle.getByRole('button', { name: 'Cerrar detalles' })).toBeDisabled()
   await pagina.keyboard.press('Escape')
   await expect(detalle).toBeVisible()
-  await detalle.getByRole('button', { name: 'Reintentar comprobante' }).click()
-  await expect(detalle.getByText('Comprobante asociado correctamente.')).toBeVisible()
+  await detalle.getByRole('button', { name: 'Reintentar registro' }).click()
+  await expect(detalle.getByText('Evidencia guardada: recibo.png')).toBeVisible()
   await detalle.getByRole('button', { name: 'Ver comprobante', exact: true }).click()
   await expect(detalle.getByRole('img', { name: 'Comprobante del abono #51' })).toBeVisible()
-  expect(solicitudes.filter((entrada) => entrada.camino.endsWith('/abonos'))).toHaveLength(1)
+  expect(solicitudes.filter((entrada) => entrada.camino.endsWith('/abonos'))).toHaveLength(2)
   await detalle.getByRole('button', { name: 'Cerrar detalles' }).click()
   await expect(pagina.getByRole('button', { name: /Ver detalles.*\(#4\)/ })).toBeFocused()
   await pagina.getByRole('combobox', { name: 'Mes de los pagos' }).selectOption('10')

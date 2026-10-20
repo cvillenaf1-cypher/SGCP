@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { test, mock } from 'node:test'
 import request from 'supertest'
+import { adjuntarComprobante, almacenMemoria } from './support/comprobante.js'
 import { crearAplicacion } from '../src/app.js'
 import { registrarAbono } from '../src/abonos/servicio.js'
 import { validarRegistroAbono, aCentavos, desdeCentavos } from '../src/abonos/validacion.js'
@@ -13,6 +14,7 @@ const configuracion = { frontendUrl: 'http://localhost:5173', sessionMinutes: 60
 // Doble de consultas y ciclo transaccional; no simula bloqueos InnoDB.
 function prepararPool({ saldo = '0.30', existente = true, anterior, errorInsercion, errorActualizacion, rol = 'ASISTENTE' } = {}) {
   let abono = anterior
+  let comprobante
   const conexion = {
     beginTransaction: mock.fn(async () => {}),
     commit: mock.fn(async () => {}),
@@ -20,6 +22,8 @@ function prepararPool({ saldo = '0.30', existente = true, anterior, errorInserci
     release: mock.fn(() => {}),
     execute: mock.fn(async (sql, valores) => {
       if (sql.includes('FROM sesiones')) return [[{ session_id: 1, id: 42, nombre: 'Prueba', email: 'prueba@example.test', codigo: rol }]]
+      if (sql.includes('INSERT INTO comprobantes')) { comprobante = { abono_id: valores[0], nombre_original: valores[2], tipo: valores[3], tamano: valores[4], tamano_original: valores[5], huella_archivo: valores[6], fecha_asociacion: '2026-10-20 12:00:00.000' }; return [{ affectedRows: 1 }] }
+      if (sql.includes('FROM comprobantes')) return [comprobante ? [comprobante] : []]
       if (sql.includes('FROM abonos')) return [abono?.usuario_registrador_id === valores[0] && abono.clave_idempotencia === valores[1] ? [{ ...abono }] : []]
       if (sql.includes('FROM obligaciones')) return [existente ? [{ id: 1, saldo_pendiente: saldo }] : []]
       if (sql.includes('INSERT INTO abonos')) {
@@ -119,25 +123,25 @@ test('abonos: error SQL y conflictos de bloqueo revierten y liberan', async () =
 test('abonos: ruta exige sesión, ASISTENTE, identificador y cuerpo válido', async () => {
   for (const rol of ['ASISTENTE', 'GERENTE']) {
     const doble = prepararPool({ rol })
-    const aplicacion = await crearAplicacion({ pool: doble.pool, config: configuracion })
+    const aplicacion = await crearAplicacion({ pool: doble.pool, config: configuracion, almacenComprobantes: almacenMemoria() })
     const enviar = (ruta = '/api/obligaciones/1/abonos') => request(aplicacion).post(ruta).auth('a'.repeat(64), { type: 'bearer' })
     await request(aplicacion).post('/api/obligaciones/1/abonos').send(entrada).expect(401)
     if (rol === 'GERENTE') { await enviar().send(entrada).expect(403); continue }
     await enviar('/api/obligaciones/01/abonos').send(entrada).expect(422)
     for (const cuerpo of [{}, { ...entrada, monto: '0' }, { ...entrada, medio_pago: 'Cheque' }, { ...entrada, saldo_pendiente: '0' }]) await enviar().send(cuerpo).expect(422)
-    const primero = await enviar().send(entrada).expect(201)
-    const segundo = await enviar().send({ ...entrada, monto: '0.1' }).expect(200)
+    const primero = await adjuntarComprobante(enviar(), entrada).expect(201)
+    const segundo = await adjuntarComprobante(enviar(), { ...entrada, monto: '0.1' }).expect(200)
     assert.deepEqual(segundo.body, primero.body)
-    await enviar().send({ ...entrada, monto: '0.20' }).expect(409)
+    await adjuntarComprobante(enviar(), { ...entrada, monto: '0.20' }).expect(409)
     assert.equal(primero.body.abono.usuario_registrador_id, 42)
   }
 })
 
 test('abonos: petición manual sobre una obligación pagada devuelve 409 sin escrituras', async () => {
   const doble = prepararPool({ saldo: '0.00' })
-  const aplicacion = await crearAplicacion({ pool: doble.pool, config: configuracion })
-  const respuesta = await request(aplicacion).post('/api/obligaciones/1/abonos')
-    .auth('a'.repeat(64), { type: 'bearer' }).send(entrada).expect(409)
+  const aplicacion = await crearAplicacion({ pool: doble.pool, config: configuracion, almacenComprobantes: almacenMemoria() })
+  const respuesta = await adjuntarComprobante(request(aplicacion).post('/api/obligaciones/1/abonos')
+    .auth('a'.repeat(64), { type: 'bearer' }), entrada).expect(409)
 
   assert.deepEqual(respuesta.body, { message: 'La obligación está pagada o el abono supera su saldo pendiente.' })
   assert.equal(doble.saldo(), '0.00')
@@ -149,9 +153,9 @@ test('abonos: petición manual sobre una obligación pagada devuelve 409 sin esc
 
 test('abonos: pago total rechaza una nueva clave y conserva el reintento idempotente', async () => {
   const doble = prepararPool({ saldo: '0.10' })
-  const aplicacion = await crearAplicacion({ pool: doble.pool, config: configuracion })
-  const enviar = (cuerpo) => request(aplicacion).post('/api/obligaciones/1/abonos')
-    .auth('a'.repeat(64), { type: 'bearer' }).send(cuerpo)
+  const aplicacion = await crearAplicacion({ pool: doble.pool, config: configuracion, almacenComprobantes: almacenMemoria() })
+  const enviar = (cuerpo) => adjuntarComprobante(request(aplicacion).post('/api/obligaciones/1/abonos')
+    .auth('a'.repeat(64), { type: 'bearer' }), cuerpo)
 
   const primero = await enviar(entrada).expect(201)
   assert.equal(primero.body.abono.saldo_resultante, '0.00')

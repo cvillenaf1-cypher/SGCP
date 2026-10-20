@@ -56,11 +56,11 @@ function ComprobanteDelAbono({ abono }) {
     solicitar('/api/abonos/' + abono.id + '/comprobante/archivo', { respuestaComo: 'blob', signal: controlador.signal })
       .then((archivo) => {
         if (controlador.signal.aborted) return
-        if (!(archivo instanceof Blob) || !['image/png', 'image/jpeg'].includes(archivo.type) || archivo.size === 0) {
-          throw new Error('El servidor no devolvió una imagen válida del comprobante.')
+        if (!(archivo instanceof Blob) || !['image/png', 'image/jpeg', 'application/pdf'].includes(archivo.type) || archivo.size === 0) {
+          throw new Error('El servidor no devolvió un comprobante válido.')
         }
         direccion = URL.createObjectURL(archivo)
-        establecerConsulta({ cargando: false, direccion, error: '' })
+        establecerConsulta({ cargando: false, direccion, tipo: archivo.type, error: '' })
       })
       .catch((fallo) => {
         if (!controlador.signal.aborted) establecerConsulta({ cargando: false, direccion: '', error: fallo.message })
@@ -85,7 +85,8 @@ function ComprobanteDelAbono({ abono }) {
         establecerIntento((actual) => actual + 1)
       }}>Reintentar comprobante</button>
     </>}
-    {consulta.direccion && <img src={consulta.direccion} alt={'Comprobante del abono #' + abono.id}
+    {consulta.direccion && consulta.tipo === 'application/pdf' && <a href={consulta.direccion} download={'comprobante-abono-' + abono.id + '.pdf'}>Descargar comprobante PDF</a>}
+    {consulta.direccion && consulta.tipo !== 'application/pdf' && <img src={consulta.direccion} alt={'Comprobante del abono #' + abono.id}
       onError={() => establecerConsulta({ cargando: false, direccion: '', error: 'No se pudo visualizar el comprobante.' })} />}
   </section>
 }

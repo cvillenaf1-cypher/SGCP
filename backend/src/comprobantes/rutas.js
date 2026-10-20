@@ -75,7 +75,7 @@ export function registrarRutasComprobantes(aplicacion, conexiones, requerirSesio
       const datos = await almacen.leer(fila.identificador_archivo)
       respuesta.set({
         'Content-Type': fila.tipo,
-        'Content-Disposition': `attachment; filename="comprobante-${fila.abono_id}.${fila.tipo === 'image/png' ? 'png' : 'jpg'}"`,
+        'Content-Disposition': `attachment; filename="comprobante-${fila.abono_id}.${fila.tipo === 'application/pdf' ? 'pdf' : fila.tipo === 'image/png' ? 'png' : 'jpg'}"`,
         'X-Content-Type-Options': 'nosniff',
         'Content-Security-Policy': "default-src 'none'; sandbox",
       }).send(datos)

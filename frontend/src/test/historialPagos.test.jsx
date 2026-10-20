@@ -410,6 +410,21 @@ describe('Consultar historial real de pagos — HU-05', () => {
     expect(within(screen.getByRole('list', { name: 'Historial de abonos' })).getByText('S/ 300.00')).toBeInTheDocument()
   })
 
+  it('permite descargar un PDF autenticado sin tratarlo como imagen', async () => {
+    const solicitar = vi.fn().mockResolvedValueOnce({ obligaciones: [obligacion] })
+      .mockResolvedValueOnce({ historial: datosHistorial() }).mockResolvedValue(new Blob(['factura'], { type: 'application/pdf' }))
+    prepararHistorial(solicitar)
+    await seleccionarObligacion()
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver comprobante' }))
+    const enlace = await screen.findByRole('link', { name: 'Descargar comprobante PDF' })
+    expect(enlace).toHaveAttribute('href', 'blob:comprobante-de-prueba')
+    expect(enlace).toHaveAttribute('download', 'comprobante-abono-9.pdf')
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    comprobarSoloLectura(solicitar)
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar comprobante' }))
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:comprobante-de-prueba')
+  })
+
   it('consulta el comprobante como imagen autenticada y libera su URL al cerrarlo', async () => {
     const imagen = new Blob(['imagen de prueba'], { type: 'image/png' })
     const solicitar = vi.fn().mockResolvedValueOnce({ obligaciones: [obligacion] })

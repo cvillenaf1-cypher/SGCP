@@ -8,7 +8,7 @@ const DIRECTORIO_PRIVADO = fileURLToPath(new URL('../../../.local/comprobantes/'
 export function crearAlmacenComprobantes(directorio = DIRECTORIO_PRIVADO, operaciones = { mkdir, open, unlink }) {
   const raiz = resolve(directorio)
   function resolverArchivo(identificador) {
-    if (!/^[a-f0-9-]{36}\.(jpg|png)$/.test(identificador)) throw new Error('Identificador interno de comprobante inválido.')
+    if (!/^[a-f0-9-]{36}\.(jpg|png|pdf)$/.test(identificador)) throw new Error('Identificador interno de comprobante inválido.')
     return join(raiz, identificador)
   }
   return {

@@ -17,7 +17,7 @@ export async function solicitarApi(ruta, { token, method: metodo = 'GET', body: 
     respuesta = await fetch(`${urlApi}${ruta}`, {
       method: metodo,
       headers: {
-        Accept: respuestaComo === 'blob' ? 'image/png, image/jpeg' : 'application/json',
+        Accept: respuestaComo === 'blob' ? 'image/png, image/jpeg, application/pdf' : 'application/json',
         ...(cuerpo !== undefined && !esFormulario ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },

@@ -3,6 +3,19 @@ import { ErrorComprobante } from './validacion.js'
 const CONSULTA = `SELECT abono_id, identificador_archivo, nombre_original, tipo,
   tamano, tamano_original, huella_archivo, fecha_asociacion FROM comprobantes WHERE abono_id = ?`
 
+export async function consultarComprobanteRegistrado(conexion, id) {
+  const [[fila]] = await conexion.execute(`${CONSULTA} FOR UPDATE`, [id])
+  return fila || null
+}
+
+export async function insertarComprobante(conexion, id, identificador, imagen) {
+  await conexion.execute(`INSERT INTO comprobantes
+    (abono_id, identificador_archivo, nombre_original, tipo, tamano, tamano_original, huella_archivo)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  [id, identificador, imagen.nombre, imagen.tipo, imagen.datos.length, imagen.tamanoOriginal, imagen.huella])
+  return presentarComprobante(await consultarComprobanteRegistrado(conexion, id))
+}
+
 export function presentarComprobante(fila) {
   return {
     abono_id: fila.abono_id, nombre: fila.nombre_original, tipo: fila.tipo,

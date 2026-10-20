@@ -7,7 +7,8 @@ import { fechaActualNegocio } from '../../backend/src/obligaciones/consulta.js'
 
 const requerirBackend = createRequire(new URL('../../backend/package.json', import.meta.url))
 const sharp = requerirBackend('sharp')
-let usuario, obligacionId, concepto, imagen
+const { PDFDocument } = requerirBackend('pdf-lib')
+let usuario, obligacionId, concepto, imagen, pdf
 
 test.beforeEach(async ({ request: solicitudes }) => {
   usuario = JSON.parse(process.env.SGCP_E2E_USERS).find((entrada) => entrada.role === 'ASISTENTE')
@@ -22,6 +23,9 @@ test.beforeEach(async ({ request: solicitudes }) => {
   expect(respuesta.status()).toBe(201)
   obligacionId = (await respuesta.json()).obligacion.id
   imagen = await sharp({ create: { width: 4, height: 4, channels: 3, background: { r: 20, g: 100, b: 30 } } }).png().toBuffer()
+  const documento = await PDFDocument.create()
+  documento.addPage().drawText('Factura de prueba')
+  pdf = Buffer.from(await documento.save())
 })
 
 test.afterEach(async () => {
@@ -37,7 +41,7 @@ test.afterEach(async () => {
   } finally { await conexiones.end(); obligacionId = null }
 })
 
-async function prepararPantalla(pagina, monto) {
+async function prepararPantalla(pagina, monto, usarPdf = false) {
   await pagina.goto('/#/login')
   await pagina.getByLabel('Correo electrónico').fill(usuario.email)
   await pagina.getByLabel('Contraseña', { exact: true }).fill(usuario.password)
@@ -46,67 +50,54 @@ async function prepararPantalla(pagina, monto) {
   await pagina.getByRole('dialog').getByRole('button', { name: 'Registrar pago', exact: true }).click()
   await pagina.getByLabel('Monto del abono (S/)').fill(monto)
   await pagina.getByLabel('Medio de pago', { exact: true }).selectOption('Efectivo')
-  await pagina.getByLabel('Comprobante (opcional)').setInputFiles({ name: 'recibo.png', mimeType: 'image/png', buffer: imagen })
-  await expect(pagina.getByRole('img', { name: 'Vista previa local de recibo.png' })).toBeVisible()
+  await pagina.getByLabel('Comprobante o factura (obligatorio)').setInputFiles(usarPdf
+    ? { name: 'factura.pdf', mimeType: 'application/pdf', buffer: pdf }
+    : { name: 'recibo.png', mimeType: 'image/png', buffer: imagen })
+  if (usarPdf) await expect(pagina.getByText('Documento PDF seleccionado.')).toBeVisible()
+  else await expect(pagina.getByRole('img', { name: 'Vista previa local de recibo.png' })).toBeVisible()
 }
 
-async function verificarPersistencia(saldo, cantidadComprobantes) {
+async function verificarPersistencia(saldo, cantidadComprobantes, cantidadAbonos = 1) {
   const { pool: conexiones } = await abrirBasePruebas()
   try {
     const [[obligacion]] = await conexiones.execute('SELECT saldo_pendiente FROM obligaciones WHERE id = ?', [obligacionId])
     const [[abonos]] = await conexiones.execute('SELECT COUNT(*) AS cantidad FROM abonos WHERE obligacion_id = ?', [obligacionId])
     const [[comprobantes]] = await conexiones.execute('SELECT COUNT(*) AS cantidad FROM comprobantes c JOIN abonos a ON a.id = c.abono_id WHERE a.obligacion_id = ?', [obligacionId])
     expect(obligacion.saldo_pendiente).toBe(saldo)
-    expect(Number(abonos.cantidad)).toBe(1)
+    expect(Number(abonos.cantidad)).toBe(cantidadAbonos)
     expect(Number(comprobantes.cantidad)).toBe(cantidadComprobantes)
   } finally { await conexiones.end() }
 }
 
-test('HU-04: falla la carga, reintenta solo el archivo y permite descargarlo', async ({ page: pagina }) => {
-  let registros = 0, cargas = 0, abonoId
-  pagina.on('request', (solicitud) => {
-    if (solicitud.method() === 'POST' && solicitud.url().endsWith(`/obligaciones/${obligacionId}/abonos`)) registros++
-  })
-  await pagina.route('**/api/abonos/*/comprobante', async (ruta) => {
-    if (ruta.request().method() !== 'POST') return ruta.continue()
-    cargas++
-    abonoId = Number(ruta.request().url().split('/').at(-2))
+test('evidencia: un fallo de envío no registra pago; el reintento guarda ambos y permite descargar', async ({ page: pagina }) => {
+  let registros = 0
+  await pagina.route('**/api/obligaciones/*/abonos', async (ruta) => {
+    registros++
     expect(ruta.request().headers()['content-type']).toContain('multipart/form-data')
-    if (cargas === 1) return ruta.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Fallo de carga simulado.' }) })
+    if (registros === 1) return ruta.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Fallo de envío simulado.' }) })
     return ruta.continue()
   })
-  await prepararPantalla(pagina, '10.00')
+  await prepararPantalla(pagina, '10.00', true)
   await pagina.getByRole('button', { name: 'Registrar abono' }).click()
-  await expect(pagina.getByText(/Fallo de carga simulado.*El abono ya está registrado/)).toBeVisible()
-  await verificarPersistencia('30.00', 0)
-  await pagina.getByRole('button', { name: 'Reintentar comprobante' }).click()
-  await expect(pagina.getByText('Comprobante asociado correctamente.')).toBeVisible()
-  expect(registros).toBe(1)
-  expect(cargas).toBe(2)
-  const { pool: conexiones } = await abrirBasePruebas()
-  try {
-    const [[abono]] = await conexiones.execute('SELECT id FROM abonos WHERE obligacion_id = ?', [obligacionId])
-    expect(abonoId).toBe(abono.id)
-  } finally { await conexiones.end() }
+  await expect(pagina.getByText(/Fallo de envío simulado/)).toBeVisible()
+  await expect(pagina.getByText('Abono registrado correctamente.')).toHaveCount(0)
+  await verificarPersistencia('40.00', 0, 0)
+  await pagina.getByRole('button', { name: 'Reintentar registro' }).click()
+  await expect(pagina.getByText('Evidencia guardada: factura.pdf')).toBeVisible()
   await verificarPersistencia('30.00', 1)
-  await pagina.getByRole('button', { name: 'Consultar comprobante' }).click()
-  await expect(pagina.getByText('El servidor confirma que el abono tiene comprobante.')).toBeVisible()
+  expect(registros).toBe(2)
   const descargaPendiente = pagina.waitForEvent('download')
-  await pagina.getByRole('button', { name: 'Descargar comprobante' }).click()
+  await pagina.getByRole('button', { name: 'Descargar comprobante', exact: true }).click()
   const descarga = await descargaPendiente
-  expect(descarga.suggestedFilename()).toBe('recibo.png')
+  expect(descarga.suggestedFilename()).toBe('factura.pdf')
   expect(await descarga.failure()).toBeNull()
 })
 
-test('HU-04: respuesta de carga perdida y saldo cero no duplican abono ni comprobante', async ({ page: pagina }) => {
-  let cargas = 0, registros = 0
-  pagina.on('request', (solicitud) => {
-    if (solicitud.method() === 'POST' && solicitud.url().endsWith(`/obligaciones/${obligacionId}/abonos`)) registros++
-  })
-  await pagina.route('**/api/abonos/*/comprobante', async (ruta) => {
-    if (ruta.request().method() !== 'POST') return ruta.continue()
-    cargas++
-    if (cargas === 1) {
+test('evidencia: una respuesta perdida al cancelar el saldo se recupera sin duplicar pago ni archivo', async ({ page: pagina }) => {
+  let registros = 0
+  await pagina.route('**/api/obligaciones/*/abonos', async (ruta) => {
+    registros++
+    if (registros === 1) {
       const respuesta = await ruta.fetch()
       expect(respuesta.status()).toBe(201)
       return ruta.abort('failed')
@@ -115,12 +106,11 @@ test('HU-04: respuesta de carga perdida y saldo cero no duplican abono ni compro
   })
   await prepararPantalla(pagina, '40.00')
   await pagina.getByRole('button', { name: 'Registrar abono' }).click()
-  await expect(pagina.getByText(/El abono ya está registrado.*Reintenta solo el comprobante/)).toBeVisible()
+  await expect(pagina.getByRole('button', { name: 'Reintentar registro' })).toBeVisible()
+  await verificarPersistencia('0.00', 1)
+  await pagina.getByRole('button', { name: 'Reintentar registro' }).click()
+  await expect(pagina.getByText('Evidencia guardada: recibo.png')).toBeVisible()
   await expect(pagina.getByRole('dialog').locator('.inicio-resumen').getByText('Pagado', { exact: true })).toBeVisible()
   await verificarPersistencia('0.00', 1)
-  await pagina.getByRole('button', { name: 'Reintentar comprobante' }).click()
-  await expect(pagina.getByText('Comprobante asociado correctamente.')).toBeVisible()
-  await verificarPersistencia('0.00', 1)
-  expect(registros).toBe(1)
-  expect(cargas).toBe(2)
+  expect(registros).toBe(2)
 })

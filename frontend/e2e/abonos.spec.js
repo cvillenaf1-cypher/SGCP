@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { leerAbono, adjuntarEvidencia } from './support/comprobante.js'
+import { eliminarComprobantesDeObligacion } from '../../backend/test/support/comprobante.js'
 import { abrirBasePruebas } from '../../backend/test/support/database.js'
 import { fechaActualNegocio } from '../../backend/src/obligaciones/consulta.js'
 
@@ -24,6 +26,7 @@ test.afterAll(async () => {
   if (!identificador) return
   const { pool: conexiones } = await abrirBasePruebas()
   try {
+    await eliminarComprobantesDeObligacion(conexiones, identificador)
     await conexiones.execute('DELETE FROM abonos WHERE obligacion_id = ?', [identificador])
     await conexiones.execute('DELETE FROM obligaciones WHERE id = ? AND usuario_creador_id = ?', [identificador, usuario.id])
   }
@@ -39,9 +42,12 @@ test('HU-03 registra abonos parciales y completos y actualiza el saldo real', as
   await pagina.getByRole('dialog').getByRole('button', { name: 'Registrar pago', exact: true }).click()
   await expect(pagina.getByLabel('Monto del abono (S/)')).toBeVisible()
   const escrituras = []
-  pagina.on('request', (solicitud) => {
-    if (solicitud.method() === 'POST') escrituras.push({ url: solicitud.url(), body: solicitud.postDataJSON() })
+  await pagina.route('**/api/obligaciones/*/abonos', async (ruta) => {
+    const solicitud = ruta.request()
+    escrituras.push({ url: solicitud.url(), body: leerAbono(solicitud) })
+    await ruta.continue()
   })
+  await adjuntarEvidencia(pagina)
   await pagina.getByRole('button', { name: 'Registrar abono' }).click()
   await expect(pagina.getByText('Ingresa el monto del abono en soles.', { exact: true })).toBeVisible()
   await expect(pagina.getByText('Selecciona el medio de pago utilizado.', { exact: true })).toBeVisible()
@@ -55,6 +61,7 @@ test('HU-03 registra abonos parciales y completos y actualiza el saldo real', as
   await expect(pagina.getByRole('dialog').locator('.inicio-resumen').getByText('S/ 95.00', { exact: true })).toBeVisible()
   await pagina.getByLabel('Monto del abono (S/)').fill('95.00')
   await pagina.getByLabel('Medio de pago', { exact: true }).selectOption('Transferencia bancaria')
+  await adjuntarEvidencia(pagina)
   await pagina.getByRole('button', { name: 'Registrar abono' }).click()
   await expect(pagina.getByText('Abono registrado correctamente.')).toBeVisible()
   await expect(pagina.getByRole('dialog').locator('.inicio-resumen').getByText('Pagado', { exact: true })).toBeVisible()

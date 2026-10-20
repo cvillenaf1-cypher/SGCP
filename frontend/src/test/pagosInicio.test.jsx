@@ -23,7 +23,7 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 
-function preparar({ obligaciones = datos, abonosIniciales = [], puedeRegistrar = true, registrar, cargar, consultarDetalle, fallarTrasRegistro = false } = {}) {
+function preparar({ obligaciones = datos, abonosIniciales = [], puedeRegistrar = true, registrar, consultarDetalle, fallarTrasRegistro = false } = {}) {
   const filas = structuredClone(obligaciones)
   const abonos = structuredClone(abonosIniciales)
   const solicitar = vi.fn(async (ruta, opciones = {}) => {
@@ -41,16 +41,11 @@ function preparar({ obligaciones = datos, abonosIniciales = [], puedeRegistrar =
       }
     }
     if (ruta.endsWith('/abonos') && opciones.method === 'POST') {
-      const resultado = registrar ? await registrar(opciones.body) : { abono: { id: 50 + abonos.length, obligacion_id: fila.id, saldo_resultante: (Number(fila.saldo_pendiente) - Number(opciones.body.monto)).toFixed(2) } }
+      const entrada = Object.fromEntries(opciones.body)
+      const resultado = registrar ? await registrar(entrada) : { abono: { id: 50 + abonos.length, obligacion_id: fila.id, saldo_resultante: (Number(fila.saldo_pendiente) - Number(entrada.monto)).toFixed(2) } }
       fila.saldo_pendiente = resultado.abono.saldo_resultante
-      abonos.push({ ...resultado.abono, monto: opciones.body.monto, medio_pago: opciones.body.medio_pago, fecha_registro: '2026-10-20T16:00:00Z', tiene_comprobante: false })
-      return resultado
-    }
-    if (ruta === '/api/abonos/50/comprobante') {
-      if (opciones.method === 'POST' && cargar) await cargar(opciones.body)
-      abonos[0].tiene_comprobante = true
-      abonos[0].puede_descargar_comprobante = true
-      return { tiene_comprobante: true, comprobante: { abono_id: 50, nombre: 'recibo.png' } }
+      abonos.push({ ...resultado.abono, monto: entrada.monto, medio_pago: entrada.medio_pago, fecha_registro: '2026-10-20T16:00:00Z', tiene_comprobante: true, puede_descargar_comprobante: true })
+      return { ...resultado, comprobante: { abono_id: resultado.abono.id, nombre: 'recibo.png', tipo: 'image/png' } }
     }
     if (ruta === '/api/abonos/50/comprobante/archivo') return new Blob(['imagen'], { type: 'image/png' })
     if (consultarDetalle) return consultarDetalle(fila)
@@ -75,6 +70,7 @@ async function completar(monto = '25.00') {
   if (registrar) fireEvent.click(registrar)
   fireEvent.change(await screen.findByLabelText('Monto del abono (S/)'), { target: { value: monto } })
   fireEvent.change(screen.getByLabelText('Medio de pago'), { target: { value: 'Efectivo' } })
+  fireEvent.change(screen.getByLabelText('Comprobante o factura (obligatorio)'), { target: { files: [new File(['imagen'], 'recibo.png', { type: 'image/png' })] } })
 }
 
 describe('Período y prioridad del inicio', () => {
@@ -230,7 +226,7 @@ describe('Registro directo y comprobantes', () => {
     await waitFor(() => expect(fila).toHaveTextContent('S/ 75.00'))
     expect(fila).toHaveTextContent('Parcial')
     expect(await screen.findByRole('list', { name: 'Historial de abonos' })).toHaveTextContent('S/ 25.00')
-    expect(solicitar.mock.calls.find(([ruta]) => ruta.endsWith('/abonos'))[1].body).toEqual({ monto: '25.00', medio_pago: 'Efectivo', clave_idempotencia: expect.any(String) })
+    expect(Object.fromEntries(solicitar.mock.calls.find(([ruta]) => ruta.endsWith('/abonos'))[1].body)).toMatchObject({ monto: '25.00', medio_pago: 'Efectivo', clave_idempotencia: expect.any(String), comprobante: expect.any(File) })
   })
 
   it('muestra los abonos anteriores y limita el nuevo pago al saldo restante dentro del diálogo', async () => {
@@ -296,7 +292,7 @@ describe('Registro directo y comprobantes', () => {
       ).toBeInTheDocument()
     })
     await waitFor(() => expect(within(screen.getByRole('table')).getByText('Pagado')).toBeInTheDocument())
-    expect(within(panel).getByRole('list', { name: 'Historial de abonos' })).toHaveTextContent('S/ 20.00')
+    expect(await within(panel).findByRole('list', { name: 'Historial de abonos' })).toHaveTextContent('S/ 20.00')
     fireEvent.click(within(panel).getByRole('button', { name: 'Cerrar detalles' }))
     expect(screen.getByRole('button', { name: /Ver detalles/ })).toHaveFocus()
   })
@@ -344,20 +340,14 @@ describe('Registro directo y comprobantes', () => {
     await waitFor(() => expect(within(panel).getByRole('button', { name: 'Cerrar detalles' })).toBeEnabled())
   })
 
-  it('conserva la confirmación del abono si falla el archivo y reintenta solo el comprobante', async () => {
-    const cargar = vi.fn().mockRejectedValueOnce(new Error('No se recibió respuesta del archivo')).mockResolvedValue(undefined)
-    const { solicitar } = preparar({ obligaciones: [obligacion], cargar })
+  it('muestra la evidencia del abono confirmado en el historial del detalle', async () => {
+    const { solicitar } = preparar({ obligaciones: [obligacion] })
     const panel = await abrir()
     await completar('100.00')
-    fireEvent.change(screen.getByLabelText('Comprobante (opcional)'), { target: { files: [new File(['imagen'], 'recibo.png', { type: 'image/png' })] } })
     fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
-    expect(await screen.findByText(/El abono ya está registrado. Reintenta solo el comprobante/)).toBeInTheDocument()
-    expect(screen.getByText('Abono registrado correctamente.')).toBeInTheDocument()
-    expect(within(panel).getByRole('button', { name: 'Cerrar detalles' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Reintentar comprobante' }))
-    await screen.findByText('Comprobante asociado correctamente.')
+    await screen.findByText('Evidencia guardada: recibo.png')
+    await waitFor(() => expect(within(panel).getByRole('button', { name: 'Cerrar detalles' })).toBeEnabled())
     expect(solicitar.mock.calls.filter(([ruta]) => ruta.endsWith('/abonos'))).toHaveLength(1)
-    expect(cargar).toHaveBeenCalledTimes(2)
     fireEvent.click(await screen.findByRole('button', { name: 'Ver comprobante', exact: true }))
     expect(await screen.findByRole('img', { name: 'Comprobante del abono #50' })).toHaveAttribute('src', 'blob:recibo')
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalles' }))

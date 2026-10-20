@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAutenticacion } from '../auth/useAuth'
 import { convertirACentimos, mediosPago, validarAbono } from '../lib/validarAbono'
+import { validarComprobante } from '../lib/validarComprobante'
 import { formatearImporte } from '../lib/formatearImporte'
 import { SelectorComprobante } from './SelectorComprobante'
 import { actualizarEstadoObligacion } from '../lib/pagosInicio'
@@ -19,29 +20,27 @@ export function DatosObligacionAbono({ identificador, alBloquear, alActualizarOb
   const [comprobante, establecerComprobante] = useState(null)
   const [errorComprobante, establecerErrorComprobante] = useState('')
   const [registroComprobante, establecerRegistroComprobante] = useState(null)
-  const [procesandoComprobante, establecerProcesandoComprobante] = useState(false)
-  const [mensajeComprobante, establecerMensajeComprobante] = useState('')
-  const [falloComprobante, establecerFalloComprobante] = useState('')
-  const cargaEnCurso = useRef(false)
+  const [descargando, establecerDescargando] = useState(false)
   const formulario = useRef(null)
   const envioEnCurso = useRef(false)
   const operacionPendienteRef = useRef(null)
+  const bloqueada = guardando || Boolean(operacionPendiente) || descargando
 
   useEffect(() => {
-    alBloquear(guardando || Boolean(operacionPendiente) || procesandoComprobante || Boolean(registroComprobante?.incierto))
+    alBloquear(bloqueada)
     return () => alBloquear(false)
-  }, [alBloquear, guardando, operacionPendiente, procesandoComprobante, registroComprobante])
+  }, [alBloquear, bloqueada])
 
   useEffect(() => {
-    if (!guardando && !operacionPendiente && !procesandoComprobante && !registroComprobante?.incierto) return
+    if (!bloqueada) return
     const protegerSalida = (evento) => { evento.preventDefault(); evento.returnValue = '' }
     window.addEventListener('beforeunload', protegerSalida)
     return () => window.removeEventListener('beforeunload', protegerSalida)
-  }, [guardando, operacionPendiente, procesandoComprobante, registroComprobante])
+  }, [bloqueada])
 
   useEffect(() => {
     const controlador = new AbortController()
-    solicitar(`/api/obligaciones/${identificador}`, { signal: controlador.signal })
+    solicitar('/api/obligaciones/' + identificador, { signal: controlador.signal })
       .then((datos) => {
         if (!datos?.obligacion || convertirACentimos(datos.obligacion.saldo_pendiente) === null || convertirACentimos(datos.obligacion.monto_original) === null) throw new Error('El servidor no devolvió datos válidos de la obligación.')
         if (!controlador.signal.aborted) {
@@ -60,88 +59,62 @@ export function DatosObligacionAbono({ identificador, alBloquear, alActualizarOb
 
   async function comprobarAbono(evento) {
     evento.preventDefault()
-    if (envioEnCurso.current || registroComprobante) return
+    if (envioEnCurso.current) return
     establecerAviso('')
     establecerMensajeError('')
-
-    if (errorComprobante) {
-      formulario.current.elements.namedItem('comprobante')?.focus()
-      return
-    }
-
     let operacion = operacionPendienteRef.current
     if (!operacion) {
       const nuevosErrores = validarAbono(valores, consulta.obligacion.saldo_pendiente)
+      const falloArchivo = validarComprobante(comprobante)
       establecerErrores(nuevosErrores)
-      if (Object.keys(nuevosErrores).length) {
-        formulario.current.elements.namedItem(Object.keys(nuevosErrores)[0])?.focus()
+      establecerErrorComprobante(falloArchivo)
+      if (Object.keys(nuevosErrores).length || falloArchivo) {
+        formulario.current.elements.namedItem(Object.keys(nuevosErrores)[0] || 'comprobante')?.focus()
         return
       }
-      const claveIdempotencia = globalThis.crypto?.randomUUID?.()
-      if (!claveIdempotencia) {
-        establecerMensajeError('No se pudo generar una clave segura para esta operación. Recarga la página e intenta nuevamente.')
-        return
-      }
-      operacion = {
-        cuerpo: {
-          monto: valores.montoAbono,
-          medio_pago: valores.medioPago,
-          clave_idempotencia: claveIdempotencia,
-        },
-      }
+      const clave = globalThis.crypto?.randomUUID?.()
+      if (!clave) { establecerMensajeError('No se pudo generar una clave segura para esta operación.'); return }
+      const cuerpo = new FormData()
+      cuerpo.append('monto', valores.montoAbono)
+      cuerpo.append('medio_pago', valores.medioPago)
+      cuerpo.append('clave_idempotencia', clave)
+      cuerpo.append('comprobante', comprobante)
+      operacion = { cuerpo }
       operacionPendienteRef.current = operacion
       establecerOperacionPendiente(operacion)
     }
-
     envioEnCurso.current = true
     establecerGuardando(true)
     try {
-      const resultado = await solicitar(`/api/obligaciones/${identificador}/abonos`, {
-        method: 'POST',
-        body: operacion.cuerpo,
-      })
-      const saldoResultante = convertirACentimos(resultado?.abono?.saldo_resultante)
-      if (
-        !resultado?.abono
-        || (comprobante && (!Number.isSafeInteger(resultado.abono.id) || resultado.abono.id < 1))
-        || String(resultado.abono.obligacion_id) !== String(identificador)
-        || saldoResultante === null
-        || saldoResultante < 0n
-      ) {
-        throw new Error('El servidor no devolvió una confirmación válida del abono.')
+      const resultado = await solicitar('/api/obligaciones/' + identificador + '/abonos', { method: 'POST', body: operacion.cuerpo })
+      const saldo = convertirACentimos(resultado?.abono?.saldo_resultante)
+      if (!Number.isSafeInteger(resultado?.abono?.id) || resultado.abono.id < 1
+        || String(resultado.abono.obligacion_id) !== String(identificador) || saldo === null || saldo < 0n
+        || resultado.comprobante?.abono_id !== resultado.abono.id || !resultado.comprobante.nombre) {
+        throw new Error('El servidor no confirmó el abono con su evidencia. Reintenta la misma operación.')
       }
       operacionPendienteRef.current = null
       establecerOperacionPendiente(null)
       establecerErrores({})
       establecerAviso(resultado.message || 'Abono registrado correctamente.')
+      establecerRegistroComprobante(resultado.comprobante)
+      establecerComprobante(null)
+      establecerErrorComprobante('')
+      establecerValores({ montoAbono: '', medioPago: '' })
       alActualizarObligacion(actualizarEstadoObligacion({ ...consulta.obligacion, saldo_pendiente: resultado.abono.saldo_resultante }))
       alRegistrar?.()
-      establecerValores({ montoAbono: '', medioPago: '' })
       actualizarSaldo()
-      if (comprobante) {
-        const registro = { abonoId: resultado.abono.id, archivo: comprobante, metadatos: null, incierto: false }
-        establecerRegistroComprobante(registro)
-        await subirComprobante(registro)
-      }
     } catch (error) {
       const campos = error?.fields || {}
-      const nuevosErrores = {
-        ...(campos.monto ? { montoAbono: campos.monto } : {}),
-        ...(campos.medio_pago ? { medioPago: campos.medio_pago } : {}),
-        ...(campos.id ? { obligacion: campos.id } : {}),
-      }
-      establecerErrores(nuevosErrores)
-      if (error?.status === 409) {
+      establecerErrores({ ...(campos.monto ? { montoAbono: campos.monto } : {}), ...(campos.medio_pago ? { medioPago: campos.medio_pago } : {}) })
+      if (campos.comprobante) establecerErrorComprobante(campos.comprobante)
+      if ([400, 409, 413, 415, 422].includes(error.status)) {
         operacionPendienteRef.current = null
         establecerOperacionPendiente(null)
-        establecerMensajeError(error.message || 'El saldo cambió. Se actualizará antes de registrar otro abono.')
-        actualizarSaldo()
-      } else if (error?.status === 422) {
-        operacionPendienteRef.current = null
-        establecerOperacionPendiente(null)
-        establecerMensajeError(error.message || 'Revisa los datos del abono.')
+        establecerMensajeError(error.message || 'Revisa los datos y la evidencia del pago.')
+        if (error.status === 409) actualizarSaldo()
       } else {
-        establecerMensajeError(`${error?.message || 'No se pudo confirmar el registro.'} Reintenta para consultar la misma operación sin duplicarla.`)
+        establecerMensajeError((error.message || 'No se pudo confirmar el registro.') + ' Reintenta con la misma evidencia y clave, sin duplicar el abono.')
       }
     } finally {
       envioEnCurso.current = false
@@ -149,126 +122,38 @@ export function DatosObligacionAbono({ identificador, alBloquear, alActualizarOb
     }
   }
 
-
-  async function subirComprobante(registro = registroComprobante) {
-    if (cargaEnCurso.current || !registro?.archivo || errorComprobante) return
-    cargaEnCurso.current = true
-    establecerProcesandoComprobante(true)
-    establecerFalloComprobante('')
-    establecerMensajeComprobante('')
-    try {
-      const cuerpo = new FormData()
-      cuerpo.append('comprobante', registro.archivo)
-      const resultado = await solicitar(`/api/abonos/${registro.abonoId}/comprobante`, { method: 'POST', body: cuerpo })
-      if (resultado?.comprobante?.abono_id !== registro.abonoId) throw new Error('No se pudo confirmar la asociación del archivo.')
-      establecerRegistroComprobante({ ...registro, metadatos: resultado.comprobante, incierto: false })
-      establecerMensajeComprobante('Comprobante asociado correctamente.')
-      alRegistrar?.()
-    } catch (error) {
-      // El abono ya se confirmó: aquí nunca se llama al registro monetario.
-      const incierto = !error.status || error.status >= 500
-      establecerRegistroComprobante({ ...registro, incierto })
-      establecerFalloComprobante(`${error.message || 'No se pudo adjuntar el archivo.'} El abono ya está registrado. Reintenta solo el comprobante.`)
-    } finally {
-      cargaEnCurso.current = false
-      establecerProcesandoComprobante(false)
-    }
-  }
-
-  async function consultarComprobante() {
-    if (cargaEnCurso.current) return
-    cargaEnCurso.current = true
-    establecerProcesandoComprobante(true)
-    establecerFalloComprobante('')
-    try {
-      const resultado = await solicitar(`/api/abonos/${registroComprobante.abonoId}/comprobante`)
-      if (resultado.tiene_comprobante && resultado.comprobante?.abono_id === registroComprobante.abonoId) {
-        establecerRegistroComprobante({ ...registroComprobante, metadatos: resultado.comprobante, incierto: false })
-        establecerMensajeComprobante('El servidor confirma que el abono tiene comprobante.')
-        alRegistrar?.()
-      } else {
-        establecerRegistroComprobante({ ...registroComprobante, incierto: false })
-        establecerMensajeComprobante('El servidor todavía no confirma un comprobante asociado. Puedes reintentar el mismo archivo.')
-      }
-    } catch (error) {
-      establecerFalloComprobante(error.message || 'No se pudo consultar el comprobante.')
-    } finally {
-      cargaEnCurso.current = false
-      establecerProcesandoComprobante(false)
-    }
-  }
-
   async function descargarComprobante() {
-    if (cargaEnCurso.current) return
-    cargaEnCurso.current = true
-    establecerProcesandoComprobante(true)
-    establecerFalloComprobante('')
+    if (descargando) return
+    establecerDescargando(true)
+    establecerMensajeError('')
     try {
-      const archivo = await solicitar(`/api/abonos/${registroComprobante.abonoId}/comprobante/archivo`, { respuestaComo: 'blob' })
+      const archivo = await solicitar('/api/abonos/' + registroComprobante.abono_id + '/comprobante/archivo', { respuestaComo: 'blob' })
       const direccion = URL.createObjectURL(archivo)
       try {
         const enlace = document.createElement('a')
         enlace.href = direccion
-        enlace.download = registroComprobante.metadatos.nombre
+        enlace.download = registroComprobante.nombre
         document.body.append(enlace)
         enlace.click()
         enlace.remove()
       } finally { URL.revokeObjectURL(direccion) }
-    } catch (error) {
-      establecerFalloComprobante(error.message || 'No se pudo descargar el comprobante.')
-    } finally {
-      cargaEnCurso.current = false
-      establecerProcesandoComprobante(false)
-    }
+    } catch (error) { establecerMensajeError(error.message || 'No se pudo descargar el comprobante.') }
+    finally { establecerDescargando(false) }
   }
 
-  const panelComprobante = registroComprobante && <section aria-label="Comprobante del abono registrado">
-    <p>Abono #{registroComprobante.abonoId} registrado. La carga del archivo no modifica el saldo.</p>
-    {procesandoComprobante && <p role="status">Procesando comprobante…</p>}
-    {mensajeComprobante && <p role="status">{mensajeComprobante}</p>}
-    {falloComprobante && <p role="alert">{falloComprobante}</p>}
-    {!registroComprobante.metadatos && <>
-      <SelectorComprobante archivo={registroComprobante.archivo} error={errorComprobante}
-        deshabilitado={procesandoComprobante || registroComprobante.incierto}
-        alCambiar={(archivo, error) => {
-          establecerErrorComprobante(error)
-          establecerRegistroComprobante({ ...registroComprobante, archivo })
-        }} />
-      <button type="button" disabled={procesandoComprobante || !registroComprobante.archivo || Boolean(errorComprobante)}
-        onClick={() => subirComprobante()}>Reintentar comprobante</button>
-    </>}
-    <button type="button" disabled={procesandoComprobante} onClick={consultarComprobante}>Consultar comprobante</button>
-    {registroComprobante.metadatos && <>
-      <p>Comprobante guardado: {registroComprobante.metadatos.nombre}</p>
-      <button type="button" disabled={procesandoComprobante} onClick={descargarComprobante}>Descargar comprobante</button>
-      <button type="button" disabled={procesandoComprobante} onClick={() => {
-        establecerRegistroComprobante(null)
-        establecerComprobante(null)
-        establecerErrorComprobante('')
-        establecerValores({ montoAbono: '', medioPago: '' })
-        establecerAviso('')
-      }}>Continuar</button>
-    </>}
-  </section>
-
-  if (consulta.cargando) return <>
-    {panelComprobante}
+  const confirmacion = <>
     {aviso && <p className="notice" role="status">{aviso}</p>}
     {mensajeError && <p className="error-message" role="alert">{mensajeError}</p>}
-    <p role="status">Consultando el saldo actual…</p>
+    {registroComprobante && <section aria-label="Comprobante del abono registrado">
+      <p>Evidencia guardada: {registroComprobante.nombre}</p>
+      <button type="button" className="secondary-button" disabled={descargando} onClick={descargarComprobante}>Descargar comprobante</button>
+    </section>}
   </>
-  if (consulta.error) return <>
-    {panelComprobante}
-    {aviso && <p className="notice" role="status">{aviso}</p>}
-    {mensajeError && <p className="error-message" role="alert">{mensajeError}</p>}
-    <p className="error-message" role="alert">{consulta.error}</p>
-    <button type="button" onClick={actualizarSaldo}>Reintentar saldo</button>
-  </>
-
+  if (consulta.cargando) return <>{confirmacion}<p role="status">Consultando el saldo actual…</p></>
+  if (consulta.error) return <>{confirmacion}<p className="error-message" role="alert">{consulta.error}</p><button type="button" onClick={actualizarSaldo}>Reintentar saldo</button></>
   const obligacion = consulta.obligacion
   const tieneSaldo = convertirACentimos(obligacion.saldo_pendiente) > 0n
   return <>
-    {panelComprobante}
     {mostrarResumen && <dl className="abono-resumen">
       <div><dt>Concepto</dt><dd>{obligacion.concepto}</dd></div>
       <div><dt>Beneficiario</dt><dd>{obligacion.beneficiario}</dd></div>
@@ -277,15 +162,14 @@ export function DatosObligacionAbono({ identificador, alBloquear, alActualizarOb
       <div><dt>Estado económico</dt><dd>{obligacion.estado_economico}</dd></div>
       {obligacion.vencida && <div><dt>Vencimiento</dt><dd>Vencida</dd></div>}
     </dl>}
-    {aviso && <p className="notice" role="status">{aviso}</p>}
-    {mensajeError && <p className="error-message" role="alert">{mensajeError}</p>}
-    {!tieneSaldo ? <p className="notice" role="alert">Esta obligación ya está pagada. Selecciona otra obligación con saldo disponible.</p> : !registroComprobante && <form ref={formulario} noValidate onSubmit={comprobarAbono}>
+    {confirmacion}
+    {!tieneSaldo ? <p className="notice" role="alert">Esta obligación ya está pagada. Selecciona otra obligación con saldo disponible.</p> : <form ref={formulario} noValidate onSubmit={comprobarAbono}>
       <div className="abono-campos">
         <div className="field">
           <label htmlFor="monto-abono">Monto del abono (S/)</label>
-          <input id="monto-abono" name="montoAbono" type="text" inputMode="decimal" required disabled={guardando || Boolean(operacionPendiente)}
-            value={valores.montoAbono} onChange={(evento) => { establecerValores({ ...valores, montoAbono: evento.target.value }); establecerAviso(''); establecerMensajeError('') }}
-            aria-invalid={Boolean(errores.montoAbono)} aria-describedby={`ayuda-monto-abono${errores.montoAbono ? ' error-monto-abono' : ''}`} />
+          <input id="monto-abono" name="montoAbono" type="text" inputMode="decimal" required disabled={guardando || Boolean(operacionPendiente)} value={valores.montoAbono}
+            onChange={(evento) => { establecerValores({ ...valores, montoAbono: evento.target.value }); establecerAviso(''); establecerMensajeError('') }}
+            aria-invalid={Boolean(errores.montoAbono)} aria-describedby={'ayuda-monto-abono' + (errores.montoAbono ? ' error-monto-abono' : '')} />
           <small id="ayuda-monto-abono" className="description">Mayor que cero, hasta dos decimales. Máximo a abonar: {formatearImporte(obligacion.saldo_pendiente)}.</small>
           {errores.montoAbono && <p className="field-error" id="error-monto-abono">{errores.montoAbono}</p>}
         </div>
@@ -293,7 +177,7 @@ export function DatosObligacionAbono({ identificador, alBloquear, alActualizarOb
           <label htmlFor="medio-abono">Medio de pago</label>
           <select id="medio-abono" name="medioPago" required value={valores.medioPago} disabled={guardando || Boolean(operacionPendiente)}
             onChange={(evento) => { establecerValores({ ...valores, medioPago: evento.target.value }); establecerAviso(''); establecerMensajeError('') }}
-            aria-invalid={Boolean(errores.medioPago)} aria-describedby={`ayuda-medio-abono${errores.medioPago ? ' error-medio-abono' : ''}`}>
+            aria-invalid={Boolean(errores.medioPago)} aria-describedby={'ayuda-medio-abono' + (errores.medioPago ? ' error-medio-abono' : '')}>
             <option value="">Selecciona un medio de pago</option>
             {mediosPago.map((medio) => <option key={medio} value={medio}>{medio}</option>)}
           </select>

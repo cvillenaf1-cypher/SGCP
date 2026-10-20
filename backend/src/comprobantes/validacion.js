@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import sharp from 'sharp'
+import { PDFDocument } from 'pdf-lib'
 
 export const LIMITE_ARCHIVO = 5 * 1024 * 1024
 
@@ -11,9 +12,25 @@ export class ErrorComprobante extends Error {
 }
 
 export async function validarComprobante(archivo) {
-  if (!archivo?.buffer?.length) throw new ErrorComprobante(422, 'Adjunta un comprobante JPG o PNG en el campo comprobante.')
+  if (!archivo?.buffer?.length) throw new ErrorComprobante(422, 'Adjunta un comprobante obligatorio en JPG, PNG o PDF.')
   const contenido = archivo.buffer
   if (contenido.length > LIMITE_ARCHIVO) throw new ErrorComprobante(413, 'El comprobante supera los 5 MB.')
+  if (archivo.mimetype === 'application/pdf') {
+    if (!/\.pdf$/i.test(archivo.originalname || '') || !contenido.subarray(0, 5).equals(Buffer.from('%PDF-'))
+      || !contenido.subarray(-1024).includes(Buffer.from('%%EOF'))) {
+      throw new ErrorComprobante(422, 'El contenido y la extensión deben corresponder a un PDF válido.')
+    }
+    try {
+      const documento = await PDFDocument.load(contenido, { updateMetadata: false, throwOnInvalidObject: true })
+      if (documento.isEncrypted || documento.getPageCount() < 1) throw new Error('PDF sin páginas o protegido.')
+    } catch {
+      throw new ErrorComprobante(422, 'Adjunta un PDF válido, con páginas y sin contraseña.')
+    }
+    const nombre = (archivo.originalname || '').split(/[\\/]/).at(-1)
+      .replace(/\.pdf$/i, '').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80) || 'comprobante'
+    return { datos: contenido, tipo: 'application/pdf', extension: 'pdf', nombre: `${nombre}.pdf`,
+      tamanoOriginal: contenido.length, huella: createHash('sha256').update(contenido).digest('hex') }
+  }
   const esPng = contenido.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
   const esJpg = contenido[0] === 255 && contenido[1] === 216 && contenido[2] === 255
   const tipo = esPng ? 'image/png' : esJpg ? 'image/jpeg' : null

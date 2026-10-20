@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import request from 'supertest'
 import sharp from 'sharp'
+import { registrarAbono } from '../src/abonos/servicio.js'
 import { crearAplicacion } from '../src/app.js'
 import { crearAlmacenComprobantes } from '../src/comprobantes/almacen.js'
 import { validarComprobante, LIMITE_ARCHIVO } from '../src/comprobantes/validacion.js'
@@ -58,9 +59,9 @@ async function nuevoAbono() {
     .send({ concepto: 'Prueba HU-04', beneficiario: 'Proveedor', monto: '100.00', fecha_limite: '2027-01-01' }).expect(201)
   const id = obligacion.body.obligacion.id
   obligaciones.push(id)
-  const respuesta = await request(aplicacion).post(`/api/obligaciones/${id}/abonos`).auth(tokens[0], { type: 'bearer' })
-    .send({ monto: '10.00', medio_pago: 'Efectivo', clave_idempotencia: crypto.randomUUID() }).expect(201)
-  const abono = respuesta.body.abono.id
+  // Registro antiguo de prueba, anterior a la evidencia obligatoria.
+  const respuesta = await registrarAbono(conexiones, id, { monto: '10.00', medio_pago: 'Efectivo', clave_idempotencia: crypto.randomUUID() }, usuarios[0].id)
+  const abono = respuesta.abono.id
   abonos.push(abono)
   return { id: abono, obligacionId: id }
 }
@@ -70,7 +71,7 @@ function cargar(id, { datos = png, nombre = 'comprobante.png', tipo = 'image/png
     .attach('comprobante', datos, { filename: nombre, contentType: tipo })
 }
 
-test('HU-04: HU-03 acepta abonos sin adjuntos y la consulta informa ausencia', async () => {
+test('HU-04: conserva registros antiguos sin adjuntos y la consulta informa ausencia', async () => {
   const { id } = await nuevoAbono()
   const respuesta = await request(aplicacion).get(`/api/abonos/${id}/comprobante`).auth(tokens[0], { type: 'bearer' }).expect(200)
   assert.deepEqual(respuesta.body, { tiene_comprobante: false, comprobante: null })

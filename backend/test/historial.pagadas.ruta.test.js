@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
 import request from 'supertest'
+import { adjuntarComprobante } from './support/comprobante.js'
 import { crearAplicacion } from '../src/app.js'
 
 test('historial: conserva los pagos de una obligacion pagada tras rechazar otro abono', async () => {
@@ -60,8 +61,8 @@ test('historial: conserva los pagos de una obligacion pagada tras rechazar otro 
     { id: 12, monto: '60.00' }, { id: 11, monto: '40.00' },
   ])
 
-  const rechazo = await request(aplicacion).post('/api/obligaciones/81/abonos').auth(token, { type: 'bearer' })
-    .send({ monto: '1.00', medio_pago: 'Efectivo', clave_idempotencia: claveNueva }).expect(409)
+  const rechazo = await adjuntarComprobante(request(aplicacion).post('/api/obligaciones/81/abonos').auth(token, { type: 'bearer' }),
+    { monto: '1.00', medio_pago: 'Efectivo', clave_idempotencia: claveNueva }).expect(409)
   assert.match(rechazo.body.message, /pagada/i)
   assert.equal(conexion.rollback.mock.callCount(), 1)
   assert.equal(conexion.commit.mock.callCount(), 0)

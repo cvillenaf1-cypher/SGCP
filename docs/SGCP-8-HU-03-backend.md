@@ -1,5 +1,9 @@
 # SGCP-8 · HU-03 · Registrar pagos realizados (backend)
 
+> Documento de la entrega original. El contrato JSON descrito aquí fue sustituido
+> por multipart con evidencia obligatoria para pagos nuevos. Consulta el
+> [contrato vigente](evidencia-obligatoria.md).
+
 Registra abonos parciales o el pago total de una obligación ya abonada por medios
 externos. SGCP únicamente deja constancia: no mueve dinero ni procesa pagos. Esta entrega cubre
 únicamente el backend: no incluye comprobantes, pantallas, funciones de gerente,

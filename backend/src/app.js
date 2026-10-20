@@ -1,7 +1,10 @@
 import { consultarHistorial } from './historial/consulta.js'
 import { registrarRutasComprobantes } from './comprobantes/rutas.js'
 import { validarRegistroAbono } from './abonos/validacion.js'
-import { registrarAbono, ErrorAbono } from './abonos/servicio.js'
+import { registrarAbonoConComprobante, ErrorAbono } from './abonos/servicio.js'
+import { crearRecepcionComprobante } from './comprobantes/carga.js'
+import { validarComprobante, ErrorComprobante } from './comprobantes/validacion.js'
+import { crearAlmacenComprobantes } from './comprobantes/almacen.js'
 import cors from 'cors'
 import express from 'express'
 import { rateLimit } from 'express-rate-limit'
@@ -18,6 +21,7 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion,
   const aplicacion = express()
   const servicio = await crearServicioAutenticacion(conexiones, configuracion.sessionMinutes)
   const requerirSesion = autenticar(conexiones)
+  const almacen = almacenComprobantes || crearAlmacenComprobantes()
   aplicacion.disable('x-powered-by')
   aplicacion.use(helmet())
   aplicacion.use(cors({ origin: configuracion.frontendUrl, methods: ['GET', 'POST'], allowedHeaders: ['Content-Type', 'Authorization'] }))
@@ -72,15 +76,17 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion,
     if (!obligacion) return respuesta.status(404).json({ message: 'Obligación no encontrada.' })
     respuesta.json({ obligacion })
   })
-  aplicacion.post('/api/obligaciones/:id/abonos', requerirSesion, autorizar(ROLES.ASISTENTE), async (solicitud, respuesta) => {
+  aplicacion.post('/api/obligaciones/:id/abonos', requerirSesion, autorizar(ROLES.ASISTENTE), ...crearRecepcionComprobante(3), async (solicitud, respuesta) => {
     const identificador = validarIdentificadorObligacion(solicitud.params.id)
     const { fields: camposAbono, ...entrada } = validarRegistroAbono(solicitud.body)
     const campos = { ...identificador.fields, ...camposAbono }
     if (Object.keys(campos).length) return respuesta.status(422).json({ message: 'Revisa los datos del abono.', fields: campos })
     try {
-      const { nuevo, abono } = await registrarAbono(conexiones, identificador.id, entrada, solicitud.auth.user.id)
-      respuesta.status(nuevo ? 201 : 200).json({ message: 'Abono registrado correctamente.', abono })
+      const evidencia = await validarComprobante(solicitud.file)
+      const { nuevo, abono, comprobante } = await registrarAbonoConComprobante(conexiones, identificador.id, entrada, solicitud.auth.user.id, evidencia, almacen)
+      respuesta.status(nuevo ? 201 : 200).json({ message: 'Abono registrado correctamente.', abono, comprobante })
     } catch (error) {
+      if (error instanceof ErrorComprobante) return respuesta.status(error.estado).json({ message: error.message, fields: { comprobante: error.message } })
       if (error instanceof ErrorAbono) return respuesta.status(error.estado).json({ message: error.message })
       throw error
     }
@@ -95,7 +101,7 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion,
     respuesta.json({ historial })
   })
 
-  registrarRutasComprobantes(aplicacion, conexiones, requerirSesion, almacenComprobantes)
+  registrarRutasComprobantes(aplicacion, conexiones, requerirSesion, almacen)
 
   // Paneles iniciales: permiten comprobar autorización real sin adelantar historias financieras.
   aplicacion.get('/api/panel/asistente', requerirSesion, autorizar(ROLES.ASISTENTE), (_solicitud, respuesta) => {
