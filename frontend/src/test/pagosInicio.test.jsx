@@ -4,10 +4,6 @@ import { ContextoAutenticacion } from '../auth/AuthContext'
 import { PagosInicio } from '../components/PagosInicio'
 import { fechaActualLima, seleccionarPagosInicio } from '../lib/pagosInicio'
 
-// jsdom no implementa el diálogo nativo; el aislamiento y el foco se verifican en Playwright.
-HTMLDialogElement.prototype.showModal = function () { this.open = true }
-HTMLDialogElement.prototype.close = function () { this.open = false }
-
 const obligacion = { id: 1, concepto: 'Servicio de internet', beneficiario: 'Proveedor empresarial', monto_original: '100.00', saldo_pendiente: '100.00', fecha_limite: '2026-10-25', fecha_registro: '2026-09-01T15:00:00Z', estado_economico: 'PENDIENTE', vencida: false }
 const datos = [
   obligacion,
@@ -66,6 +62,8 @@ function preparar({ obligaciones = datos, abonosIniciales = [], puedeRegistrar =
 }
 
 async function abrir(id = 1) {
+  const mes = datos.find((fila) => fila.id === id)?.fecha_limite.slice(5, 7)
+  if (mes) fireEvent.change(screen.getByRole('combobox', { name: 'Mes de los pagos' }), { target: { value: mes } })
   fireEvent.click(await screen.findByRole('button', { name: new RegExp(`Ver detalles.*\\(#${id}\\)$`) }))
   const panel = screen.getByRole('dialog', { name: `Detalle de la obligación #${id}` })
   await within(panel).findByText('Beneficiario')
@@ -80,9 +78,12 @@ async function completar(monto = '25.00') {
 }
 
 describe('Período y prioridad del inicio', () => {
-  it('incluye el mes completo y vencidas antiguas con saldo, excluye futuras y antiguas pagadas y no modifica los datos', () => {
+  it('incluye solo el mes seleccionado del año actual, con cualquier estado, sin modificar los datos', () => {
     const originales = structuredClone(datos)
-    expect(seleccionarPagosInicio(datos, '2026-10-20').map((fila) => fila.id)).toEqual([4, 7, 1, 2, 3])
+    expect(seleccionarPagosInicio(datos, '2026-10-20').map((fila) => fila.id)).toEqual([7, 1, 2, 3])
+    expect(seleccionarPagosInicio(datos, '2026-10-20', '09').map((fila) => fila.id)).toEqual([4, 5])
+    expect(seleccionarPagosInicio(datos, '2026-10-20', '11').map((fila) => fila.id)).toEqual([6])
+    expect(seleccionarPagosInicio([...datos, { ...obligacion, id: 8, fecha_limite: '2025-10-25' }], '2026-10-20').map((fila) => fila.id)).toEqual([7, 1, 2, 3])
     expect(datos).toEqual(originales)
   })
 
@@ -100,15 +101,19 @@ describe('Período y prioridad del inicio', () => {
 })
 
 describe('Consulta inicial compartida y detalles', () => {
-  it('carga automáticamente el mes y las deudas antiguas sin filtros ni selector de mes', async () => {
+  it('selecciona automáticamente el mes actual y ofrece solo los doce meses sin selector de año', async () => {
     const { solicitar } = preparar()
     const tabla = await screen.findByRole('table')
     expect(solicitar.mock.calls[0][0]).toBe('/api/obligaciones')
-    expect(within(tabla).getAllByRole('row')).toHaveLength(6)
-    for (const nombre of ['Servicio de internet', 'Abono del mes', 'Pagada del mes', 'Deuda antigua', 'Vencida del mes']) expect(within(tabla).getByText(nombre)).toBeInTheDocument()
+    expect(within(tabla).getAllByRole('row')).toHaveLength(5)
+    for (const nombre of ['Servicio de internet', 'Abono del mes', 'Pagada del mes', 'Vencida del mes']) expect(within(tabla).getByText(nombre)).toBeInTheDocument()
     expect(screen.queryByText('Deuda futura')).not.toBeInTheDocument()
     expect(screen.queryByText('Pagada antigua')).not.toBeInTheDocument()
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    const filtro = screen.getByRole('combobox', { name: 'Mes de los pagos' })
+    expect(filtro).toHaveValue('10')
+    expect(within(filtro).getAllByRole('option')).toHaveLength(12)
+    expect(filtro.textContent).not.toMatch(/2026|2027/)
+    expect(screen.getAllByRole('combobox')).toHaveLength(1)
     for (const fila of within(tabla).getAllByRole('row').slice(1)) {
       expect(within(fila).getAllByRole('button')).toHaveLength(1)
       expect(within(fila).getByRole('button', { name: /Ver detalles/ })).toHaveAttribute('aria-haspopup', 'dialog')
@@ -118,6 +123,7 @@ describe('Consulta inicial compartida y detalles', () => {
 
   it('abre por fila y botón, muestra datos y permite cerrar con Escape devolviendo el foco', async () => {
     preparar()
+    fireEvent.change(screen.getByRole('combobox', { name: 'Mes de los pagos' }), { target: { value: '09' } })
     const boton = await screen.findByRole('button', { name: /Ver detalles.*\(#4\)/ })
     fireEvent.click(boton.closest('tr'))
     const panel = await screen.findByRole('dialog', { name: 'Detalle de la obligación #4' })
@@ -151,10 +157,46 @@ describe('Consulta inicial compartida y detalles', () => {
   it('cambia de mes al recuperar el foco de la ventana sin recargar la página', async () => {
     preparar()
     await screen.findByRole('table')
+    fireEvent.change(screen.getByRole('combobox', { name: 'Mes de los pagos' }), { target: { value: '09' } })
     vi.setSystemTime(new Date('2026-11-01T05:00:00Z'))
     fireEvent(window, new Event('focus'))
     expect(await screen.findByText('Deuda futura')).toBeInTheDocument()
     expect(screen.queryByText('Pagada del mes')).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Mes de los pagos' })).toHaveValue('11')
+  })
+
+  it('actualiza la tabla al elegir un mes sin nuevas peticiones y conserva el mes al cambiar solo de día', async () => {
+    const { solicitar } = preparar()
+    await screen.findByRole('table')
+    const filtro = screen.getByRole('combobox', { name: 'Mes de los pagos' })
+    fireEvent.change(filtro, { target: { value: '09' } })
+    expect(screen.getByText('Deuda antigua')).toBeInTheDocument()
+    expect(screen.getByText('Pagada antigua')).toBeInTheDocument()
+    expect(screen.queryByText('Servicio de internet')).not.toBeInTheDocument()
+    expect(solicitar).toHaveBeenCalledTimes(1)
+    vi.setSystemTime(new Date('2026-10-21T16:00:00Z'))
+    fireEvent(window, new Event('focus'))
+    await waitFor(() => expect(solicitar).toHaveBeenCalledTimes(2))
+    expect(filtro).toHaveValue('09')
+    fireEvent.change(filtro, { target: { value: '01' } })
+    expect(screen.getByText('No hay obligaciones para el mes seleccionado.')).toBeInTheDocument()
+  })
+
+  it('el temporizador cambia automáticamente a enero del nuevo año sin mezclar registros del año anterior', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    preparar({ obligaciones: [...datos,
+      { ...obligacion, id: 8, concepto: 'Enero anterior', fecha_limite: '2026-01-01' },
+      { ...obligacion, id: 9, concepto: 'Enero nuevo', fecha_limite: '2027-01-31' },
+    ] })
+    await screen.findByRole('table')
+    fireEvent.change(screen.getByRole('combobox', { name: 'Mes de los pagos' }), { target: { value: '09' } })
+    await act(async () => {
+      vi.setSystemTime(new Date('2027-01-01T05:00:00Z'))
+      vi.advanceTimersByTime(60000)
+    })
+    expect(await screen.findByText('Enero nuevo')).toBeInTheDocument()
+    expect(screen.queryByText('Enero anterior')).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Mes de los pagos' })).toHaveValue('01')
   })
 
   it('distingue un listado vacío y un detalle no disponible con reintento', async () => {
@@ -218,7 +260,7 @@ describe('Registro directo y comprobantes', () => {
     expect(screen.queryByLabelText('Monto del abono (S/)')).not.toBeInTheDocument()
   })
 
-  it('retira la deuda antigua cancelada conservando su detalle, confirmación e historial', async () => {
+  it('conserva la deuda de un mes anterior al cancelarla, con su confirmación e historial', async () => {
     preparar({ obligaciones: [datos[3]] })
     const panel = await abrir(4)
     await completar('20.00')
@@ -228,10 +270,10 @@ describe('Registro directo y comprobantes', () => {
         within(panel).getByText('Abono registrado correctamente.')
       ).toBeInTheDocument()
     })
-    await waitFor(() => expect(screen.queryByRole('table')).not.toBeInTheDocument())
+    await waitFor(() => expect(within(screen.getByRole('table')).getByText('Pagado')).toBeInTheDocument())
     expect(within(panel).getByRole('list', { name: 'Historial de abonos' })).toHaveTextContent('S/ 20.00')
     fireEvent.click(within(panel).getByRole('button', { name: 'Cerrar detalles' }))
-    expect(screen.getByRole('button', { name: 'Actualizar listado' })).toHaveFocus()
+    expect(screen.getByRole('button', { name: /Ver detalles/ })).toHaveFocus()
   })
 
   it('conserva el saldo confirmado y el éxito si fallan la recarga del listado y la reconsulta del saldo', async () => {
@@ -254,6 +296,7 @@ describe('Registro directo y comprobantes', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
     fireEvent.click(screen.getByRole('button', { name: 'Registrando abono…' }))
     expect(within(panel).getByRole('button', { name: 'Cerrar detalles' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Mes de los pagos' })).toBeDisabled()
     fireEvent.keyDown(panel, { key: 'Escape' })
     expect(panel).toBeInTheDocument()
     expect(alBloquear).toHaveBeenLastCalledWith(true)

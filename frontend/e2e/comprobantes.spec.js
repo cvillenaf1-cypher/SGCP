@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import { expect, test } from '@playwright/test'
 import { abrirBasePruebas } from '../../backend/test/support/database.js'
 import { crearAlmacenComprobantes } from '../../backend/src/comprobantes/almacen.js'
+import { fechaActualNegocio } from '../../backend/src/obligaciones/consulta.js'
 
 const requerirBackend = createRequire(new URL('../../backend/package.json', import.meta.url))
 const sharp = requerirBackend('sharp')
@@ -16,7 +17,7 @@ test.beforeEach(async ({ request: solicitudes }) => {
   concepto = `Integración HU-04 ${randomUUID()}`
   const respuesta = await solicitudes.post('http://127.0.0.1:3001/api/obligaciones', {
     headers: { Authorization: `Bearer ${sesion.token}` },
-    data: { concepto, beneficiario: 'Proveedor de prueba', monto: '40.00', fecha_limite: '2020-01-01' },
+    data: { concepto, beneficiario: 'Proveedor de prueba', monto: '40.00', fecha_limite: fechaActualNegocio() },
   })
   expect(respuesta.status()).toBe(201)
   obligacionId = (await respuesta.json()).obligacion.id

@@ -32,8 +32,12 @@ async function completarInicioSesion() {
   return usuario
 }
 
-beforeEach(() => { vi.stubGlobal('fetch', vi.fn()); localStorage.clear(); sessionStorage.clear() })
-afterEach(() => vi.unstubAllGlobals())
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-20T16:00:00Z'))
+  vi.stubGlobal('fetch', vi.fn()); localStorage.clear(); sessionStorage.clear()
+})
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 
 describe('Acceso SGCP', () => {
   it('redirige una ruta protegida sin sesión hacia el login', () => {
@@ -64,7 +68,7 @@ describe('Acceso SGCP', () => {
       renderizarAplicacion()
       await completarInicioSesion()
       expect(await screen.findByRole('heading', { name: titulo })).toBeInTheDocument()
-      await screen.findByText('No hay obligaciones del mes ni deudas vencidas pendientes.')
+      await screen.findByText('No hay obligaciones para el mes seleccionado.')
       expect(fetch.mock.calls[1][1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
       expect(localStorage.length).toBe(0)
       expect(sessionStorage.length).toBe(0)
@@ -116,21 +120,21 @@ describe('Acceso SGCP', () => {
     renderizarAplicacion()
     await completarInicioSesion()
     await screen.findByRole('heading', { name: 'Pagos del mes' })
-    await screen.findByText('No hay obligaciones del mes ni deudas vencidas pendientes.')
+    await screen.findByText('No hay obligaciones para el mes seleccionado.')
     expect(screen.queryByRole('button', { name: 'Registrar pagos realizados' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Consultar historial de pagos' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Consultar historial de pagos' })).not.toBeInTheDocument()
     const llamada = fetch.mock.calls.find(([url]) => url.endsWith('/api/obligaciones'))
     expect(llamada[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
     expect(fetch.mock.calls.filter(([, opciones]) => opciones.method === 'POST')).toHaveLength(1)
   })
 
-  it('ASISTENTE abre el historial y una sesión vencida al consultar vuelve al login', async () => {
-    let consultas = 0
-    simularSesion('ASISTENTE', (url) => url.endsWith('/api/obligaciones') && ++consultas > 1 ? respuesta({ message: 'Sesión vencida.' }, 401) : undefined)
+  it('ASISTENTE abre el detalle y una sesión vencida al consultar vuelve al login', async () => {
+    const obligacion = { id: 81, concepto: 'Limpieza', beneficiario: 'Proveedor', fecha_limite: '2026-10-01', monto_original: '100.00', saldo_pendiente: '50.00', estado_economico: 'PARCIAL' }
+    simularSesion('ASISTENTE', (url) => url.endsWith('/api/obligaciones') ? respuesta({ obligaciones: [obligacion] })
+      : url.endsWith('/api/obligaciones/81') ? respuesta({ message: 'Sesión vencida.' }, 401) : undefined)
     renderizarAplicacion()
     const usuario = await completarInicioSesion()
-    await screen.findByText('No hay obligaciones del mes ni deudas vencidas pendientes.')
-    await usuario.click(screen.getByRole('button', { name: 'Consultar historial de pagos' }))
+    await usuario.click(await screen.findByRole('button', { name: 'Ver detalles de Limpieza (#81)' }))
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
     const llamada = fetch.mock.calls.find(([url]) => url.endsWith('/api/obligaciones'))
     expect(llamada[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
@@ -139,6 +143,7 @@ describe('Acceso SGCP', () => {
   it('consulta el historial real con Bearer y únicamente realiza lecturas después del login', async () => {
     const obligacion = { id: 81, concepto: 'Servicio de limpieza', beneficiario: 'Proveedor', fecha_limite: '2026-10-01', monto_original: '100.00', saldo_pendiente: '0.00', estado_economico: 'PAGADO' }
     simularSesion('ASISTENTE', (url) => url.endsWith('/api/obligaciones') ? respuesta({ obligaciones: [obligacion] })
+      : url.endsWith('/api/obligaciones/81') ? respuesta({ obligacion })
       : url.endsWith('/historial') ? respuesta({ historial: {
         obligacion_id: 81, concepto: obligacion.concepto, monto_original: '100.00', total_abonado: '100.00', saldo_pendiente: '0.00',
         estado_economico: 'PAGADO', resumen_consistente: true, advertencia: null,
@@ -147,8 +152,7 @@ describe('Acceso SGCP', () => {
     renderizarAplicacion()
     const usuario = await completarInicioSesion()
     await screen.findByRole('heading', { name: 'Pagos del mes' })
-    await usuario.click(screen.getByRole('button', { name: 'Consultar historial de pagos' }))
-    await usuario.click(await screen.findByRole('button', { name: 'Ver historial de Servicio de limpieza (#81)' }))
+    await usuario.click(await screen.findByRole('button', { name: 'Ver detalles de Servicio de limpieza (#81)' }))
     expect(await screen.findByRole('list', { name: 'Historial de abonos' })).toHaveTextContent('Efectivo')
     const llamada = fetch.mock.calls.find(([url]) => url.endsWith('/api/obligaciones/81/historial'))
     expect(llamada[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
@@ -156,14 +160,15 @@ describe('Acceso SGCP', () => {
   })
 
   it('vuelve al login cuando vence la sesión al consultar los abonos de una obligación', async () => {
+    const obligacion = { id: 81, concepto: 'Limpieza', beneficiario: 'Servicios Pérez', fecha_limite: '2026-10-01', monto_original: '100.00', saldo_pendiente: '50.00', estado_economico: 'PARCIAL' }
     simularSesion('ASISTENTE', (url) => url.endsWith('/api/obligaciones')
-      ? respuesta({ obligaciones: [{ id: 81, concepto: 'Limpieza', beneficiario: 'Servicios Pérez', fecha_limite: '2026-10-01', monto_original: '100.00', saldo_pendiente: '50.00', estado_economico: 'PARCIAL' }] })
+      ? respuesta({ obligaciones: [obligacion] })
+      : url.endsWith('/api/obligaciones/81') ? respuesta({ obligacion })
       : url.endsWith('/historial') ? respuesta({ message: 'Sesión vencida.' }, 401) : undefined)
     renderizarAplicacion()
     const usuario = await completarInicioSesion()
     await screen.findByRole('heading', { name: 'Pagos del mes' })
-    await usuario.click(screen.getByRole('button', { name: 'Consultar historial de pagos' }))
-    await usuario.click(await screen.findByRole('button', { name: 'Ver historial de Limpieza (#81)' }))
+    await usuario.click(await screen.findByRole('button', { name: 'Ver detalles de Limpieza (#81)' }))
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
     expect(fetch.mock.calls.at(-1)[0]).toMatch(/\/api\/obligaciones\/81\/historial$/)
     expect(fetch.mock.calls.at(-1)[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
@@ -184,7 +189,7 @@ describe('Acceso SGCP', () => {
     simularSesion('ASISTENTE', (url) => { if (url.endsWith('/logout')) throw new TypeError('Network error') })
     renderizarAplicacion()
     const usuario = await completarInicioSesion()
-    await screen.findByText('No hay obligaciones del mes ni deudas vencidas pendientes.')
+    await screen.findByText('No hay obligaciones para el mes seleccionado.')
     await usuario.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cerrar la sesión en el servidor')
     expect(screen.getByRole('heading', { name: 'Panel de asistente' })).toBeInTheDocument()

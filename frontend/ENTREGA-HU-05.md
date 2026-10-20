@@ -6,25 +6,20 @@ La pantalla del ASISTENTE consulta los pagos reales de la obligación selecciona
 incluidas las pagadas. Se retiraron el ejemplo visual y los avisos de integración
 pendiente. El listado conserva la consulta general de obligaciones existente.
 
-Las obligaciones se muestran en una tabla con concepto, número, beneficiario,
-monto original, saldo y estado. El buscador superior permite localizar compromisos
-por concepto, beneficiario o empresa, número y estado, sin distinguir mayúsculas
-ni tildes. Admite varias palabras y se combina con el selector **Filtrar por
-estado**, cuyas opciones son **Todos**, **Pagados**, **Pendientes** y **Parciales**.
-Ambos filtros se aplican simultáneamente: si una empresa tiene varios compromisos,
-buscar su nombre y elegir Pagados muestra solo sus compromisos pagados.
+La tabla de **Pagos del mes** muestra concepto, número, beneficiario, monto
+original, saldo y estado. Sobre el título hay un selector de enero a diciembre.
+Inicia en el mes actual y usa automáticamente el año actual de `America/Lima`.
+Elegir un mes muestra sus obligaciones por fecha límite, incluidas las pagadas,
+sin mezclar meses ni años y sin necesidad de actualizar manualmente.
 
-El estado inicial es Todos y la búsqueda está vacía, por lo que aparecen todas
-las obligaciones, incluidas las pagadas. Elegir Todos conserva el texto buscado;
-Limpiar búsqueda conserva el estado elegido. Los filtros son locales y no realizan
-solicitudes adicionales ni cambian la consulta general de obligaciones.
+Al cambiar el mes o el año del calendario, la vista vuelve al mes actual. La fecha
+se revisa cada minuto y al recuperar el foco; cambiar solo de día conserva una
+selección manual. No hay selector de año ni botón Consultar historial de pagos.
 
-Al pulsar una fila o su botón Ver historial, los pagos se muestran debajo y la
-fila queda marcada como seleccionada. Filtrar no cierra el historial consultado:
-si la fila queda fuera de los resultados, un aviso identifica la obligación cuyo
-historial continúa abierto. La tabla tiene desplazamiento interno y encabezados
-fijos para listados largos. Si no hay coincidencias, se muestra un mensaje distinto
-al de una obligación sin abonos.
+**Ver detalles** abre una ventana modal con el resumen y todos los abonos de la
+obligación seleccionada. **Registrar pago** aparece en la cabecera si queda saldo;
+al registrar otro abono se actualizan el resumen y el historial. Si un mes no tiene
+obligaciones se muestra un mensaje distinto al de una obligación sin abonos.
 
 Lecturas utilizadas con la sesión vigente:
 
@@ -47,17 +42,13 @@ Lista completa para copiar a Jira:
 9. Cuando un compromiso no tenga pagos realizados, el sistema debe mostrar un mensaje indicando que todavía no existen abonos registrados.
 10. Al registrar un nuevo abono, este debe incorporarse al historial sin eliminar ni modificar los registros anteriores.
 11. La consulta del historial no debe modificar los montos ni la información de los pagos registrados.
-12. El sistema debe mostrar una tabla de todos los compromisos económicos registrados, incluidos los pagados, cuando no haya una búsqueda activa y el filtro de mes sea Todos los meses.
-13. La tabla debe mostrar el concepto, número identificador, beneficiario o empresa, monto original, saldo pendiente, estado y una opción Ver historial para cada compromiso.
-14. El sistema debe permitir buscar compromisos por concepto, beneficiario o empresa y número identificador, sin distinguir mayúsculas, minúsculas ni tildes. Si se ingresan varias palabras, todas deben coincidir con la información del compromiso.
-15. El sistema debe incluir un selector Filtrar por mes con Todos los meses y los períodos disponibles, indicando mes y año. Se usa la fecha límite de la obligación, sin mezclar meses de distintos años ni filtrar por estado.
-16. La búsqueda y el filtro de mes deben aplicarse simultáneamente. Buscar los alamos y seleccionar octubre de 2026 debe mostrar los compromisos de esa empresa con vencimiento en ese período, cualquiera sea su estado.
-17. Al seleccionar Todos los meses, el sistema debe conservar la búsqueda escrita y mostrar sus coincidencias en cualquier período.
-18. Al pulsar Limpiar búsqueda, el sistema debe borrar únicamente el texto buscado y conservar el mes seleccionado.
-19. Al seleccionar una fila o pulsar Ver historial, el sistema debe mostrar debajo de la tabla el resumen y los pagos de ese compromiso, y señalar qué fila está seleccionada. Ver historial también debe poder activarse con el teclado.
-20. El sistema debe mostrar cuántos compromisos coinciden con los filtros y un mensaje claro cuando la búsqueda o el mes seleccionado no tengan coincidencias. Este mensaje debe distinguirse del de un compromiso sin abonos.
-21. Al cambiar la búsqueda o el filtro de mes, el historial seleccionado debe permanecer abierto. Si su compromiso deja de aparecer en la tabla, el sistema debe mostrar un aviso que identifique el historial que sigue abierto.
-22. Buscar, filtrar por mes y seleccionar compromisos deben ser acciones de consulta: no deben crear, eliminar ni modificar compromisos, abonos, importes ni comprobantes.
+12. La tabla debe incluir los compromisos con vencimiento en el mes seleccionado del año actual, en cualquier estado.
+13. Cada compromiso debe mostrar concepto, identificador, beneficiario, monto original, saldo, vencimiento, estado y un único botón Ver detalles.
+14. El selector debe ofrecer únicamente los doce meses, sin selector de año, e iniciar en el mes actual de Lima.
+15. Elegir otro mes debe actualizar la tabla inmediatamente y distinguir un mes vacío de una obligación sin abonos.
+16. El mes y el año actuales deben actualizarse automáticamente al cambiar el calendario, también al recuperar el foco, sin mezclar registros del año anterior.
+17. Ver detalles debe abrir una ventana modal con el resumen y el historial; el menú no debe ofrecer un acceso separado a Consultar historial de pagos.
+18. Filtrar y consultar detalles no deben crear, eliminar ni modificar obligaciones, abonos, importes ni comprobantes.
 
 Las fechas se presentan en America/Lima y conservan su fecha UTC en el elemento
 time. Si el saldo almacenado difiere de monto original menos abonos, la pantalla
@@ -70,19 +61,17 @@ pendientes y libera las URLs temporales de las imágenes.
 
 ## Verificación
 
-Pruebas de componentes: tabla completa, búsqueda local por concepto, beneficiario
-o empresa y número sin diferencias de mayúsculas o tildes, filtro de mes y año,
-combinación de búsqueda y mes, conservación de filtros al elegir Todos los meses o limpiar
-la búsqueda, selección por fila y teclado, detalle conservado cuando queda fuera
-de los filtros y mensajes sin coincidencias. También se comprueban historial,
+Pruebas de componentes: selección del mes actual, filtro por mes del año actual,
+meses vacíos, cambio automático de mes y año, selección por fila y teclado y
+consulta del historial en una ventana modal. También se comprueban historial,
 errores, actualización, importes exactos, obligaciones pagadas, respuestas
 obsoletas, comprobantes y sesión vencida.
 Pruebas de backend: resumen, orden, céntimos exactos, inconsistencias, solo lectura
 y registro de otro abono sin alterar pagos anteriores.
 
 La prueba de navegador usa la aplicación y su cliente HTTP reales con respuestas
-API interceptadas de prueba. Comprueba el recorrido desde la tabla y sus filtros
-hasta el detalle, incluidos compromisos de una misma empresa en distintos estados;
+API interceptadas de prueba. Comprueba el recorrido desde la tabla y su selector
+de meses hasta los detalles, incluidos compromisos pagados de meses anteriores;
 no realiza pagos ni cambios en la base de producción.
 Desde frontend, con Chromium de Playwright instalado:
 
@@ -100,17 +89,14 @@ independiente terminada en _test; no se sustituye por la base de producción.
 
 ## Cómo revisar
 
-1. Ingresar como ASISTENTE y abrir Consultar historial de pagos. Comprobar la tabla de todos los compromisos, incluidos los pagados, con el filtro Todos y la búsqueda vacía.
-2. Buscar una obligación por concepto, beneficiario o empresa y número. Probar mayúsculas y palabras sin tildes para localizar textos con tildes.
-3. Si una empresa tiene varios compromisos, buscar su nombre y alternar Pagados, Pendientes y Parciales. Comprobar que cada resultado coincide tanto con la empresa como con el estado elegido.
-4. Elegir Todos y comprobar que la búsqueda no se borra. Elegir un estado y pulsar Limpiar búsqueda para comprobar que ese estado se conserva.
-5. Pulsar una fila o Ver historial, también con el teclado. Comprobar que debajo aparecen el monto original, total acumulado, saldo y pagos del más reciente al más antiguo.
-6. Cambiar la búsqueda o el estado para ocultar la fila seleccionada. Comprobar que el historial permanece abierto y que el aviso identifica el compromiso seleccionado.
-7. Aplicar filtros sin coincidencias y comprobar el mensaje. Consultar un compromiso sin pagos y comprobar que se muestra el mensaje específico de ausencia de abonos.
-8. Abrir Ver comprobante en un pago con imagen propia. En un entorno de pruebas, registrar otro abono, volver al historial y comprobar que aparece junto con los pagos anteriores.
+1. Ingresar como ASISTENTE y comprobar que el selector sobre Pagos del mes inicia en el mes actual, sin selector de año ni botón de historial.
+2. Elegir otro mes y comprobar que la tabla solo incluye obligaciones con vencimiento en ese mes del año actual, también las pagadas.
+3. Elegir un mes vacío y comprobar su mensaje y el acceso + a nuevas deudas.
+4. Abrir Ver detalles, también con el teclado, y comprobar resumen, abonos del más reciente al más antiguo y comprobantes autorizados.
+5. En un entorno de pruebas, registrar otro abono desde la cabecera del detalle y comprobar que se actualizan saldo, estado e historial sin eliminar pagos anteriores.
 
 La consulta general `GET /api/obligaciones` mantiene su comportamiento: no se
 ocultan globalmente los compromisos pagados ni se escriben datos al consultar,
-buscar o filtrar el historial.
+o filtrar por mes.
 
 No se añaden dependencias, migraciones ni cambios de autenticación o infraestructura.
