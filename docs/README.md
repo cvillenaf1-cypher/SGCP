@@ -10,6 +10,7 @@
 - [SGCP-9, HU-04: comprobantes privados](SGCP-9-HU-04-comprobantes.md).
 - [SGCP-10, HU-05: contrato del historial real](SGCP-10-HU-05-historial.md).
 - [Capturas de evidencia](evidence/README.md).
+- [Inicio compartido, pagos directos y comprobantes](inicio-pagos-compartido.md).
 - [Migraciones y preparación MySQL](../database/README.md).
 - [Instalación y comandos](../README.md).
 

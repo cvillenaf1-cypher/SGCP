@@ -40,7 +40,7 @@ async function prepararPantalla(pagina, monto) {
   await pagina.goto('/#/login')
   await pagina.getByLabel('Correo electrónico').fill(usuario.email)
   await pagina.getByLabel('Contraseña', { exact: true }).fill(usuario.password)
-  await pagina.getByRole('button', { name: 'Ingresar' }).click()
+  await pagina.getByRole('button', { name: /^Iniciar sesión/ }).click()
   await pagina.getByRole('button', { name: 'Registrar pagos realizados', exact: true }).click()
   await pagina.getByLabel('Pago pendiente', { exact: true }).selectOption(String(obligacionId))
   await pagina.getByLabel('Monto del abono (S/)').fill(monto)

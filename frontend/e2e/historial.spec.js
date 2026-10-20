@@ -13,7 +13,7 @@ function crearEscenario() {
     { id: 7, concepto: 'Proveedor con abonos', beneficiario: 'Proveedor de prueba', monto_original: '3000.00', saldo_pendiente: '1500.00', estado_economico: 'PARCIAL', vencida: false },
     { id: 8, concepto: 'Préstamo cancelado', beneficiario: 'Prestamista de prueba', monto_original: '200.00', saldo_pendiente: '0.00', estado_economico: 'PAGADO', vencida: false },
     { id: 9, concepto: 'Compromiso sin pagos', beneficiario: 'Otro proveedor', monto_original: '500.00', saldo_pendiente: '500.00', estado_economico: 'PENDIENTE', vencida: false },
-  ]
+  ].map((fila) => ({ ...fila, fecha_limite: '2026-10-20' }))
   const abonos = {
     7: [
       { id: 11, monto: '1000.00', medio_pago: 'Transferencia', fecha_registro: '2026-10-12T15:30:00.000Z', tiene_comprobante: true, puede_descargar_comprobante: true, url_comprobante: '/api/abonos/11/comprobante/archivo' },

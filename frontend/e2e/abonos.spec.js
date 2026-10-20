@@ -33,7 +33,7 @@ test('HU-03 registra abonos parciales y completos y actualiza el saldo real', as
   await pagina.goto('/#/login')
   await pagina.getByLabel('Correo electrónico').fill(usuario.email)
   await pagina.getByLabel('Contraseña', { exact: true }).fill(usuario.password)
-  await pagina.getByRole('button', { name: 'Ingresar' }).click()
+  await pagina.getByRole('button', { name: /^Iniciar sesión/ }).click()
   await pagina.getByRole('button', { name: 'Registrar pagos realizados', exact: true }).click()
   await expect(pagina.getByRole('option', { name: `${concepto} — S/ 120.50`, exact: true })).toBeAttached()
   await pagina.getByLabel('Pago pendiente', { exact: true }).selectOption(String(identificador))
