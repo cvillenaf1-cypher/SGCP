@@ -320,7 +320,7 @@ export function PaginaInicioSesion() {
                   name="email"
                   type="email"
                   autoComplete="username"
-                  placeholder="tu@empresa.com"
+                  placeholder="tu@gmail.com"
                   maxLength={254}
                   required
                   value={correo}
@@ -470,21 +470,6 @@ export function PaginaInicioSesion() {
               Accede con tu cuenta de asistente o gerente.
             </p>
           </div>
-
-          {/* Marca desarrolladora */}
-          <div className="sapo-pie">
-            <p className="sapo-pie-texto">Hechito en:</p>
-
-            <div className="marca-leon">
-              <div className="marca-leon-icono">LIA</div>
-
-              <div className="marca-leon-texto">
-                <strong>LEÓN IA</strong>
-                <span>SOLUTIONS</span>
-              </div>
-            </div>
-          </div>
-
         </div>
       </section>
 
