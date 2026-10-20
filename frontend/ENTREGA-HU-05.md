@@ -10,7 +10,10 @@ La tabla de **Pagos del mes** muestra concepto, número, beneficiario, monto
 original, saldo y estado. Sobre el título hay un selector de enero a diciembre.
 Inicia en el mes actual y usa automáticamente el año actual de `America/Lima`.
 Elegir un mes muestra sus obligaciones por fecha límite, incluidas las pagadas,
-sin mezclar meses ni años y sin necesidad de actualizar manualmente.
+sin necesidad de actualizar manualmente. El mes actual incluye además las deudas
+vencidas de períodos anteriores mientras tengan saldo, conservando su vencimiento
+original. También siguen disponibles en su mes original; cuando se cancelan dejan
+de arrastrarse al actual y permanecen como pagadas en su período de vencimiento.
 
 Al cambiar el mes o el año del calendario, la vista vuelve al mes actual. La fecha
 se revisa cada minuto y al recuperar el foco; cambiar solo de día conserva una
@@ -42,7 +45,7 @@ Lista completa para copiar a Jira:
 9. Cuando un compromiso no tenga pagos realizados, el sistema debe mostrar un mensaje indicando que todavía no existen abonos registrados.
 10. Al registrar un nuevo abono, este debe incorporarse al historial sin eliminar ni modificar los registros anteriores.
 11. La consulta del historial no debe modificar los montos ni la información de los pagos registrados.
-12. La tabla debe incluir los compromisos con vencimiento en el mes seleccionado del año actual, en cualquier estado.
+12. La tabla debe incluir los compromisos con vencimiento en el mes seleccionado del año actual, en cualquier estado. En el mes actual debe incluir además las vencidas con saldo de períodos anteriores, incluso de años anteriores, sin duplicar filas ni cambiar sus vencimientos.
 13. Cada compromiso debe mostrar concepto, identificador, beneficiario, monto original, saldo, vencimiento, estado y un único botón Ver detalles.
 14. El selector debe ofrecer únicamente los doce meses, sin selector de año, e iniciar en el mes actual de Lima.
 15. Elegir otro mes debe actualizar la tabla inmediatamente y distinguir un mes vacío de una obligación sin abonos.
@@ -90,7 +93,7 @@ independiente terminada en _test; no se sustituye por la base de producción.
 ## Cómo revisar
 
 1. Ingresar como ASISTENTE y comprobar que el selector sobre Pagos del mes inicia en el mes actual, sin selector de año ni botón de historial.
-2. Elegir otro mes y comprobar que la tabla solo incluye obligaciones con vencimiento en ese mes del año actual, también las pagadas.
+2. Elegir otro mes y comprobar que la tabla incluye sus obligaciones, también las pagadas. Volver al actual y comprobar que añade las vencidas de meses anteriores con saldo, retirándolas del actual al cancelarse y conservándolas en su mes original.
 3. Elegir un mes vacío y comprobar su mensaje y el acceso + a nuevas deudas.
 4. Abrir Ver detalles, también con el teclado, y comprobar resumen, abonos del más reciente al más antiguo y comprobantes autorizados.
 5. En un entorno de pruebas, registrar otro abono desde la cabecera del detalle y comprobar que se actualizan saldo, estado e historial sin eliminar pagos anteriores.

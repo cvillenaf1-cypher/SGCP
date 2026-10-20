@@ -21,9 +21,12 @@ export function actualizarEstadoObligacion(obligacion, hoy = fechaActualLima()) 
 
 export function seleccionarPagosInicio(obligaciones, hoy = fechaActualLima(), mes = hoy.slice(5, 7)) {
   const periodo = `${hoy.slice(0, 4)}-${mes}-`
+  const esMesActual = mes === hoy.slice(5, 7)
+  const inicioMesActual = `${hoy.slice(0, 7)}-01`
   const grupo = (obligacion) => obligacion.vencida ? 0 : obligacion.estado_economico === 'PAGADO' ? 2 : 1
   return obligaciones
-    .filter((obligacion) => obligacion.fecha_limite.startsWith(periodo))
+    .filter((obligacion) => obligacion.fecha_limite.startsWith(periodo)
+      || (esMesActual && obligacion.fecha_limite < inicioMesActual && convertirACentimos(obligacion.saldo_pendiente) > 0n))
     .map((obligacion) => actualizarEstadoObligacion(obligacion, hoy))
     .sort((primero, segundo) => grupo(primero) - grupo(segundo)
       || primero.fecha_limite.localeCompare(segundo.fecha_limite) || primero.id - segundo.id)
