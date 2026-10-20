@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useAutenticacion } from '../auth/useAuth'
 import { validarFormulario } from '../lib/validarPagoPendiente'
+import { fechaActualLima } from '../lib/pagosInicio'
 import './FormularioPagoPendiente.css'
 
 const valoresIniciales = { concepto: '', beneficiario: '', montoOriginal: '', fechaLimite: '' }
@@ -20,6 +21,7 @@ export function FormularioPagoPendiente() {
   const [error, establecerError] = useState('')
   const bloqueo = useRef(false)
   const formulario = useRef(null)
+  const fechaLimitePasada = Boolean(valores.fechaLimite && !validarFormulario(valores).fechaLimite && valores.fechaLimite < fechaActualLima())
 
   async function registrarPagoPendiente(evento) {
     evento.preventDefault()
@@ -64,8 +66,11 @@ export function FormularioPagoPendiente() {
             min={tipo === 'date' ? '1000-01-01' : undefined} max={tipo === 'date' ? '9999-12-31' : undefined}
             value={valores[nombre]} disabled={enviando}
             onChange={(evento) => { establecerValores({ ...valores, [nombre]: evento.target.value }); establecerMensaje('') }}
-            aria-invalid={Boolean(errores[nombre])} aria-describedby={`ayuda-${nombre}${errores[nombre] ? ` error-${nombre}` : ''}`} />
+            aria-invalid={Boolean(errores[nombre])} aria-describedby={`ayuda-${nombre}${errores[nombre] ? ` error-${nombre}` : ''}${nombre === 'fechaLimite' && fechaLimitePasada ? ' aviso-fecha-pasada' : ''}`} />
           <small className="description" id={`ayuda-${nombre}`}>{ayuda}</small>
+          {nombre === 'fechaLimite' && <div aria-live="polite">
+            {fechaLimitePasada && <p className="notice" role="note" id="aviso-fecha-pasada">La fecha seleccionada ya pasó. Esta deuda se registrará como vencida.</p>}
+          </div>}
           {errores[nombre] && <p className="field-error" id={`error-${nombre}`}>{errores[nombre]}</p>}
         </div>)}
       </div>
