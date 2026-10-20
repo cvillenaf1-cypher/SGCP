@@ -47,17 +47,17 @@ Lista completa para copiar a Jira:
 9. Cuando un compromiso no tenga pagos realizados, el sistema debe mostrar un mensaje indicando que todavía no existen abonos registrados.
 10. Al registrar un nuevo abono, este debe incorporarse al historial sin eliminar ni modificar los registros anteriores.
 11. La consulta del historial no debe modificar los montos ni la información de los pagos registrados.
-12. El sistema debe mostrar una tabla de todos los compromisos económicos registrados, incluidos los pagados, cuando no haya una búsqueda activa y el filtro de estado sea Todos.
+12. El sistema debe mostrar una tabla de todos los compromisos económicos registrados, incluidos los pagados, cuando no haya una búsqueda activa y el filtro de mes sea Todos los meses.
 13. La tabla debe mostrar el concepto, número identificador, beneficiario o empresa, monto original, saldo pendiente, estado y una opción Ver historial para cada compromiso.
 14. El sistema debe permitir buscar compromisos por concepto, beneficiario o empresa y número identificador, sin distinguir mayúsculas, minúsculas ni tildes. Si se ingresan varias palabras, todas deben coincidir con la información del compromiso.
-15. El sistema debe incluir un selector Filtrar por estado con las opciones Todos, Pagados, Pendientes y Parciales. Pagados debe mostrar compromisos totalmente pagados; Pendientes, compromisos sin abonos; y Parciales, compromisos con abonos y saldo pendiente.
-16. La búsqueda y el filtro de estado deben aplicarse simultáneamente. Por ejemplo, si la empresa Los Álamos tiene varios compromisos en distintos estados, buscar los alamos y seleccionar Pagados debe mostrar únicamente sus compromisos totalmente pagados.
-17. Al seleccionar Todos, el sistema debe conservar la búsqueda escrita y mostrar sus coincidencias en cualquier estado.
-18. Al pulsar Limpiar búsqueda, el sistema debe borrar únicamente el texto buscado y conservar el estado seleccionado.
+15. El sistema debe incluir un selector Filtrar por mes con Todos los meses y los períodos disponibles, indicando mes y año. Se usa la fecha límite de la obligación, sin mezclar meses de distintos años ni filtrar por estado.
+16. La búsqueda y el filtro de mes deben aplicarse simultáneamente. Buscar los alamos y seleccionar octubre de 2026 debe mostrar los compromisos de esa empresa con vencimiento en ese período, cualquiera sea su estado.
+17. Al seleccionar Todos los meses, el sistema debe conservar la búsqueda escrita y mostrar sus coincidencias en cualquier período.
+18. Al pulsar Limpiar búsqueda, el sistema debe borrar únicamente el texto buscado y conservar el mes seleccionado.
 19. Al seleccionar una fila o pulsar Ver historial, el sistema debe mostrar debajo de la tabla el resumen y los pagos de ese compromiso, y señalar qué fila está seleccionada. Ver historial también debe poder activarse con el teclado.
-20. El sistema debe mostrar cuántos compromisos coinciden con los filtros y un mensaje claro cuando la búsqueda o el estado seleccionado no tengan coincidencias. Este mensaje debe distinguirse del de un compromiso sin abonos.
-21. Al cambiar la búsqueda o el filtro de estado, el historial seleccionado debe permanecer abierto. Si su compromiso deja de aparecer en la tabla, el sistema debe mostrar un aviso que identifique el historial que sigue abierto.
-22. Buscar, filtrar por estado y seleccionar compromisos deben ser acciones de consulta: no deben crear, eliminar ni modificar compromisos, abonos, importes ni comprobantes.
+20. El sistema debe mostrar cuántos compromisos coinciden con los filtros y un mensaje claro cuando la búsqueda o el mes seleccionado no tengan coincidencias. Este mensaje debe distinguirse del de un compromiso sin abonos.
+21. Al cambiar la búsqueda o el filtro de mes, el historial seleccionado debe permanecer abierto. Si su compromiso deja de aparecer en la tabla, el sistema debe mostrar un aviso que identifique el historial que sigue abierto.
+22. Buscar, filtrar por mes y seleccionar compromisos deben ser acciones de consulta: no deben crear, eliminar ni modificar compromisos, abonos, importes ni comprobantes.
 
 Las fechas se presentan en America/Lima y conservan su fecha UTC en el elemento
 time. Si el saldo almacenado difiere de monto original menos abonos, la pantalla
@@ -71,8 +71,8 @@ pendientes y libera las URLs temporales de las imágenes.
 ## Verificación
 
 Pruebas de componentes: tabla completa, búsqueda local por concepto, beneficiario
-o empresa y número sin diferencias de mayúsculas o tildes, filtro de estados,
-combinación de búsqueda y estado, conservación de filtros al elegir Todos o limpiar
+o empresa y número sin diferencias de mayúsculas o tildes, filtro de mes y año,
+combinación de búsqueda y mes, conservación de filtros al elegir Todos los meses o limpiar
 la búsqueda, selección por fila y teclado, detalle conservado cuando queda fuera
 de los filtros y mensajes sin coincidencias. También se comprueban historial,
 errores, actualización, importes exactos, obligaciones pagadas, respuestas
