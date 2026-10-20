@@ -320,6 +320,7 @@ describe('Consultar historial real de pagos — HU-05', () => {
     expect(await screen.findByRole('button', { name: 'Ver historial de Alquiler pagado (#82)' })).not.toBeDisabled()
     await seleccionarObligacion(82)
     expect(await detalleHistorial().findByText('S/ 0.00')).toBeInTheDocument()
+    expect(detalleHistorial().queryByRole('button', { name: 'Actualizar historial' })).not.toBeInTheDocument()
     expect(within(screen.getByRole('list', { name: 'Historial de abonos' })).getByText('S/ 300.00')).toBeInTheDocument()
     expect(solicitar.mock.calls.at(-1)[0]).toBe('/api/obligaciones/82/historial')
     comprobarSoloLectura(solicitar)
@@ -332,6 +333,7 @@ describe('Consultar historial real de pagos — HU-05', () => {
     expect(await screen.findByText('Esta obligación todavía no tiene abonos.')).toBeInTheDocument()
     expect(detalleHistorial().getByText('S/ 0.00')).toBeInTheDocument()
     expect(detalleHistorial().getAllByText('S/ 300.00')).toHaveLength(2)
+    expect(detalleHistorial().getByRole('button', { name: 'Actualizar historial' })).toBeEnabled()
     expect(screen.queryByRole('list', { name: 'Historial de abonos' })).not.toBeInTheDocument()
   })
 

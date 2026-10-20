@@ -182,6 +182,7 @@ test('consulta el historial pagado de otro mes desde sus detalles en móvil, sin
   await seleccionarObligacion(pagina, '8')
   await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 200.00')
   await expect(pagina.getByRole('list', { name: 'Historial de abonos' }).getByRole('listitem')).toHaveCount(1)
+  await expect(pagina.getByRole('button', { name: 'Actualizar historial' })).toHaveCount(0)
   await expect(pagina.getByRole('button', { name: 'Registrar pago', exact: true })).toHaveCount(0)
   await pagina.getByRole('button', { name: 'Cerrar detalles', exact: true }).click()
   await expect(selector).toHaveValue('09')
