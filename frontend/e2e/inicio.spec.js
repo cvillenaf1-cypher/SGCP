@@ -3,17 +3,17 @@ import { leerAbono, adjuntarEvidencia } from './support/comprobante.js'
 
 const imagen = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==', 'base64')
 
-async function preparar(pagina, { rol = 'ASISTENTE', fallarArchivo = false, sinObligaciones = false } = {}) {
+async function preparar(pagina, { rol = 'ASISTENTE', fallarArchivo = false, sinObligaciones = false, obligacionesCompartidas } = {}) {
   await pagina.clock.setFixedTime(new Date('2026-10-20T16:00:00Z'))
   const base = { beneficiario: 'Proveedor de prueba', monto_original: '100.00', saldo_pendiente: '100.00', fecha_limite: '2026-10-25', fecha_registro: '2026-09-01T15:00:00Z', estado_economico: 'PENDIENTE' }
-  const obligaciones = sinObligaciones ? [] : [
+  const obligaciones = obligacionesCompartidas ?? (sinObligaciones ? [] : [
     { ...base, id: 1, concepto: 'Servicio empresarial del mes' },
     { ...base, id: 2, concepto: 'Abono parcial del mes', saldo_pendiente: '30.00', estado_economico: 'PARCIAL', fecha_limite: '2026-10-01' },
     { ...base, id: 3, concepto: 'Obligación pagada del mes', saldo_pendiente: '0.00', estado_economico: 'PAGADO' },
     { ...base, id: 4, concepto: 'Deuda vencida de septiembre', fecha_limite: '2026-09-15' },
     { ...base, id: 5, concepto: 'Pagada antigua excluida', fecha_limite: '2026-09-01', saldo_pendiente: '0.00', estado_economico: 'PAGADO' },
     { ...base, id: 6, concepto: 'Obligación futura excluida', fecha_limite: '2026-11-01' },
-  ]
+  ])
   const abonos = [{ id: 90, obligacion_id: 3, monto: '100.00', medio_pago: 'Transferencia bancaria', fecha_registro: '2026-10-18T16:00:00Z', tiene_comprobante: true, puede_descargar_comprobante: true }]
   const solicitudes = []
   let cargas = 0
@@ -76,13 +76,15 @@ async function preparar(pagina, { rol = 'ASISTENTE', fallarArchivo = false, sinO
   await pagina.getByLabel('Correo electrónico').fill('usuario@example.test')
   await pagina.getByLabel('Contraseña', { exact: true }).fill('clave-de-simulacion')
   await pagina.getByRole('button', { name: /^Iniciar sesión/ }).click()
-  if (sinObligaciones) await expect(pagina.getByRole('button', { name: 'Agregar nueva deuda' })).toBeVisible()
+  if (sinObligaciones) await expect(pagina.getByText('No hay obligaciones para el mes seleccionado.')).toBeVisible()
   else await expect(pagina.getByRole('table')).toBeVisible()
   return { solicitudes, obligaciones }
 }
 
 test('inicio automático del asistente, detalles por teclado y presentación móvil sin desbordamiento', async ({ page: pagina }) => {
   await preparar(pagina)
+  await expect(pagina.getByRole('region', { name: 'Resumen mensual' })).toHaveCount(0)
+  await expect(pagina.getByRole('article')).toHaveCount(0)
   const tabla = pagina.getByRole('table')
   await expect(pagina.getByRole('button', { name: 'Registrar pagos realizados', exact: true })).toHaveCount(0)
   await expect(pagina.getByRole('button', { name: 'Consultar historial de pagos', exact: true })).toHaveCount(0)
@@ -156,37 +158,124 @@ test('el gerente inicia con la misma lista y consulta comprobantes sin controles
   await pagina.screenshot({ path: '.local/inicio-gerente-desktop.png', fullPage: true })
 })
 
-test('el gerente conserva el selector y HU-07; la ruta duplicada ya no existe', async ({ page: pagina }) => {
+test('el resumen integrado sigue el mes, conserva el vencido y se adapta a escritorio y móvil', async ({ page: pagina }) => {
   const { solicitudes } = await preparar(pagina, { rol: 'GERENTE' })
+  const resumen = pagina.getByRole('region', { name: 'Resumen mensual' })
+  const comprobar = async (titulo, importe) => expect(resumen.getByRole('article', { name: titulo }).locator('.importe-resumen')).toHaveText(importe)
+  await expect(resumen.getByRole('article')).toHaveCount(4)
+  await comprobar('Total comprometido', 'S/ 300.00')
+  await comprobar('Total abonado', 'S/ 170.00')
+  await comprobar('Total pendiente', 'S/ 130.00')
+  await comprobar('Total vencido acumulado', 'S/ 130.00')
+  await expect(resumen).toContainText('2 obligaciones vencidas con saldo pendiente')
+  await expect(pagina.getByRole('link', { name: /Visualizar resumen mensual de pagos/ })).toHaveCount(0)
+  const titulo = await pagina.getByRole('heading', { name: 'Panel de gerente' }).boundingBox()
+  const selector = await pagina.getByRole('combobox', { name: 'Mes de los pagos' }).boundingBox()
+  const bloqueResumen = await resumen.boundingBox()
+  const tituloTabla = await pagina.getByRole('heading', { name: 'Pagos del mes' }).boundingBox()
+  expect(titulo.y + titulo.height).toBeLessThan(selector.y)
+  expect(selector.y + selector.height).toBeLessThan(bloqueResumen.y)
+  expect(bloqueResumen.y + bloqueResumen.height).toBeLessThan(tituloTabla.y)
+  const tarjetas = await resumen.getByRole('article').all()
+  expect((await tarjetas[0].boundingBox()).y).toBe((await tarjetas[3].boundingBox()).y)
+  await pagina.screenshot({ path: '.local/resumen-integrado-desktop.png', fullPage: true })
+
   await pagina.getByRole('combobox', { name: 'Mes de los pagos' }).selectOption('09')
+  await comprobar('Total comprometido', 'S/ 200.00')
+  await comprobar('Total abonado', 'S/ 100.00')
+  await comprobar('Total pendiente', 'S/ 100.00')
+  await comprobar('Total vencido acumulado', 'S/ 130.00')
   await expect(pagina.getByRole('table')).toContainText('Pagada antigua excluida')
   await expect(pagina.getByRole('table')).not.toContainText('Servicio empresarial del mes')
+  await pagina.getByRole('combobox', { name: 'Mes de los pagos' }).selectOption('01')
+  await comprobar('Total comprometido', 'S/ 0.00')
+  await comprobar('Total abonado', 'S/ 0.00')
+  await comprobar('Total pendiente', 'S/ 0.00')
+  await comprobar('Total vencido acumulado', 'S/ 130.00')
+  await expect(pagina.getByRole('table')).toHaveCount(0)
   await pagina.getByRole('button', { name: 'Volver al mes actual' }).click()
+  await comprobar('Total comprometido', 'S/ 300.00')
   await expect(pagina.getByRole('table')).toContainText('Servicio empresarial del mes')
   await expect(pagina.getByRole('table')).toContainText('Deuda vencida de septiembre')
+  expect(solicitudes.filter((entrada) => entrada.camino === '/api/obligaciones')).toHaveLength(1)
 
-  await pagina.setViewportSize({ width: 390, height: 844 })
+  for (const ancho of [768, 390, 320]) {
+    await pagina.setViewportSize({ width: ancho, height: 844 })
+    expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    const primera = await tarjetas[0].boundingBox()
+    const ultima = await tarjetas[3].boundingBox()
+    expect(ultima.y).toBeGreaterThan(primera.y)
+    if (ancho < 640) expect(ultima.x).toBe(primera.x)
+    await pagina.screenshot({ path: `.local/resumen-integrado-${ancho}.png`, fullPage: true })
+  }
   await expect(pagina.getByRole('link', { name: 'Consultar pagos del mes' })).toHaveCount(0)
-  expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  await pagina.screenshot({ path: '.local/inicio-gerente-mobile.png', fullPage: true })
-  await pagina.getByRole('link', { name: /Visualizar resumen mensual de pagos/ }).click()
-  await expect(pagina).toHaveURL(/#\/gerente\/resumen-mensual$/)
-  await expect(pagina.getByRole('heading', { name: 'Visualizar resumen mensual de pagos' })).toBeVisible()
-  await expect(pagina.getByRole('article', { name: 'Total comprometido' })).toContainText('S/ 300.00')
-  await expect(pagina.getByRole('group', { name: 'Período de consulta' })).toBeVisible()
-  await pagina.getByRole('link', { name: 'Volver al panel de gerente' }).click()
-  await expect(pagina.getByRole('table')).toBeVisible()
 
-  const consultasAntes = solicitudes.length
-  await pagina.evaluate(() => { window.location.hash = '/gerente/pagos-del-mes' })
-  await expect(pagina.getByRole('heading', { name: 'Página no encontrada' })).toBeVisible()
-  await expect(pagina.getByRole('heading', { name: 'Consultar pagos del mes' })).toHaveCount(0)
-  await expect(pagina.getByRole('group', { name: 'Período de consulta' })).toHaveCount(0)
-  await expect(pagina.getByRole('table')).toHaveCount(0)
-  expect(solicitudes).toHaveLength(consultasAntes)
-  await pagina.getByRole('link', { name: 'Volver al inicio' }).click()
-  await expect(pagina.getByRole('heading', { name: 'Panel de gerente' })).toBeVisible()
-  await expect(pagina.getByRole('table')).toContainText('Deuda vencida de septiembre')
+  for (const ruta of ['/gerente/pagos-del-mes', '/gerente/resumen-mensual']) {
+    const consultasAntes = solicitudes.length
+    await pagina.evaluate((destino) => { window.location.hash = destino }, ruta)
+    await expect(pagina.getByRole('heading', { name: 'Página no encontrada' })).toBeVisible()
+    await expect(pagina.getByRole('article')).toHaveCount(0)
+    await expect(pagina.getByRole('group', { name: 'Período de consulta' })).toHaveCount(0)
+    await expect(pagina.getByRole('table')).toHaveCount(0)
+    expect(solicitudes).toHaveLength(consultasAntes)
+    await pagina.getByRole('link', { name: 'Volver al inicio' }).click()
+    await expect(pagina.getByRole('heading', { name: 'Panel de gerente' })).toBeVisible()
+    await expect(pagina.getByRole('table')).toContainText('Deuda vencida de septiembre')
+  }
+})
+
+test('el gerente actualiza el vencido tras abonos del asistente, conservando el acceso de solo lectura', async ({ page: asistente }) => {
+  const { obligaciones } = await preparar(asistente)
+  const gerente = await asistente.context().newPage()
+  const { solicitudes } = await preparar(gerente, { rol: 'GERENTE', obligacionesCompartidas: obligaciones })
+  const vencido = gerente.getByRole('article', { name: 'Total vencido acumulado' })
+  await expect(vencido.locator('.importe-resumen')).toHaveText('S/ 130.00')
+  await asistente.getByRole('button', { name: /Ver detalles.*\(#4\)/ }).click()
+  const detalle = asistente.getByRole('dialog', { name: 'Detalle de la obligación #4' })
+  await detalle.getByRole('button', { name: 'Registrar pago', exact: true }).click()
+  await detalle.getByLabel('Monto del abono (S/)').fill('25.00')
+  await detalle.getByLabel('Medio de pago', { exact: true }).selectOption('Efectivo')
+  await adjuntarEvidencia(asistente)
+  await detalle.getByRole('button', { name: 'Registrar abono' }).click()
+  await expect(detalle.getByText('Abono registrado correctamente.')).toBeVisible()
+  await gerente.getByRole('button', { name: 'Actualizar listado' }).click()
+  await expect(vencido.locator('.importe-resumen')).toHaveText('S/ 105.00')
+  await expect(vencido).toContainText('2 obligaciones vencidas con saldo pendiente')
+  await expect(gerente.getByRole('article', { name: 'Total pendiente' }).locator('.importe-resumen')).toHaveText('S/ 130.00')
+  await expect(gerente.getByRole('table').getByRole('row').filter({ hasText: 'Deuda vencida de septiembre' })).toContainText('S/ 75.00')
+
+  await detalle.getByLabel('Monto del abono (S/)').fill('75.00')
+  await detalle.getByLabel('Medio de pago', { exact: true }).selectOption('Efectivo')
+  await adjuntarEvidencia(asistente)
+  await detalle.getByRole('button', { name: 'Registrar abono' }).click()
+  await expect(detalle.getByText(/Esta obligación ya está pagada/)).toBeVisible()
+  await gerente.getByRole('button', { name: 'Actualizar listado' }).click()
+  await expect(vencido.locator('.importe-resumen')).toHaveText('S/ 30.00')
+  await expect(vencido).toContainText('1 obligación vencida con saldo pendiente')
+  await expect(gerente.getByRole('table')).not.toContainText('Deuda vencida de septiembre')
+  expect(solicitudes.filter((entrada) => entrada.camino === '/api/obligaciones')).toHaveLength(3)
+  expect(solicitudes.filter((entrada) => entrada.metodo === 'POST').map((entrada) => entrada.camino)).toEqual(['/api/auth/login'])
+  await expect(asistente.getByRole('article')).toHaveCount(0)
+  await gerente.close()
+})
+
+test('mes pagado, deuda anterior y vencimiento de hoy se distinguen en el resumen', async ({ page: pagina }) => {
+  const base = { beneficiario: 'Proveedor', concepto: 'Octubre pagado', estado_economico: 'PAGADO', monto_original: '3100.00', saldo_pendiente: '0.00', fecha_limite: '2026-10-01' }
+  const { obligaciones } = await preparar(pagina, { rol: 'GERENTE', obligacionesCompartidas: [
+    { ...base, id: 1 },
+    { ...base, id: 2, concepto: 'Septiembre pendiente', monto_original: '100.00', saldo_pendiente: '100.00', fecha_limite: '2026-09-01', estado_economico: 'PENDIENTE' },
+  ] })
+  await expect(pagina.getByRole('article', { name: 'Total comprometido' }).locator('.importe-resumen')).toHaveText('S/ 3,100.00')
+  await expect(pagina.getByRole('article', { name: 'Total abonado' }).locator('.importe-resumen')).toHaveText('S/ 3,100.00')
+  await expect(pagina.getByRole('article', { name: 'Total pendiente' }).locator('.importe-resumen')).toHaveText('S/ 0.00')
+  const vencido = pagina.getByRole('article', { name: 'Total vencido acumulado' })
+  await expect(vencido.locator('.importe-resumen')).toHaveText('S/ 100.00')
+  await expect(vencido).toContainText('1 obligación vencida con saldo pendiente')
+  obligaciones.push({ ...base, id: 3, concepto: 'Vencimiento de hoy', monto_original: '50.00', saldo_pendiente: '50.00', fecha_limite: '2026-10-20', estado_economico: 'PENDIENTE' })
+  await pagina.getByRole('button', { name: 'Actualizar listado' }).click()
+  await expect(pagina.getByRole('article', { name: 'Total pendiente' }).locator('.importe-resumen')).toHaveText('S/ 50.00')
+  await expect(vencido.locator('.importe-resumen')).toHaveText('S/ 100.00')
+  await expect(pagina.getByRole('table').getByRole('row').filter({ hasText: 'Vencimiento de hoy' }).getByText('Vencida', { exact: true })).toHaveCount(0)
 })
 
 test('pago parcial y completo actualizan el mismo panel y conservan la obligación del mes', async ({ page: pagina }) => {
