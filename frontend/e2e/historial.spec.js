@@ -26,6 +26,7 @@ function crearEscenario() {
 }
 
 async function simularApi(pagina, escenario) {
+  await pagina.clock.setFixedTime(new Date('2026-10-20T16:00:00Z'))
   await pagina.route('**/api/**', async (ruta) => {
     const solicitud = ruta.request()
     const camino = new URL(solicitud.url()).pathname
@@ -34,7 +35,7 @@ async function simularApi(pagina, escenario) {
     escenario.solicitudes.push({ camino, metodo, cabeceras: solicitud.headers() })
     const responder = (datos, status = 200) => ruta.fulfill({ status, headers: cabecerasCors, contentType: 'application/json', body: JSON.stringify(datos) })
     if (camino === '/api/auth/login' && metodo === 'POST') {
-      return responder({ token: tokenPrueba, expiresAt: new Date(Date.now() + 3600000).toISOString(), user: { id: 1, name: 'Asistente de prueba', role: 'ASISTENTE' } })
+      return responder({ token: tokenPrueba, expiresAt: '2026-10-21T16:00:00Z', user: { id: 1, name: 'Asistente de prueba', role: 'ASISTENTE' } })
     }
     expect(solicitud.headers().authorization).toBe(`Bearer ${tokenPrueba}`)
     if (camino === '/api/panel/asistente' && metodo === 'GET') return responder({ message: 'Acceso de prueba habilitado.' })
@@ -78,12 +79,12 @@ async function simularApi(pagina, escenario) {
 }
 
 async function abrirHistorial(pagina, id = '7') {
-  await pagina.getByRole('button', { name: 'Consultar historial de pagos', exact: true }).click()
   await seleccionarObligacion(pagina, id)
 }
 
 async function seleccionarObligacion(pagina, id) {
-  await pagina.getByRole('table', { name: 'Obligaciones para consultar historial' })
+  if (await pagina.getByRole('dialog').count()) await pagina.getByRole('button', { name: 'Cerrar detalles', exact: true }).click()
+  await pagina.getByRole('table')
     .getByRole('button', { name: new RegExp(`\\(#${id}\\)$`) }).click()
 }
 
@@ -127,8 +128,6 @@ test('un nuevo abono aparece al volver al historial y conserva los pagos anterio
   await abrirHistorial(pagina)
   const lista = pagina.getByRole('list', { name: 'Historial de abonos' })
   await expect(lista.getByRole('listitem')).toHaveCount(2)
-  await pagina.getByRole('button', { name: 'Pagos del mes', exact: true }).click()
-  await pagina.getByRole('button', { name: 'Ver detalles de Proveedor con abonos (#7)', exact: true }).click()
   await pagina.getByRole('dialog').getByRole('button', { name: 'Registrar pago', exact: true }).click()
   await pagina.getByLabel('Monto del abono (S/)').fill('250.00')
   await pagina.getByLabel('Medio de pago', { exact: true }).selectOption('Efectivo')
@@ -170,133 +169,20 @@ test('historial vacío y errores recuperables no crean ni modifican pagos', asyn
   expect(escenario.solicitudes.filter(({ metodo, camino }) => metodo !== 'GET' && camino !== '/api/auth/login')).toEqual([])
 })
 
-test('la tabla permite buscar todas las obligaciones y conserva el detalle al cambiar la búsqueda', async ({ page: pagina }) => {
-  const escenario = crearEscenario()
-  await simularApi(pagina, escenario)
-  await pagina.getByRole('button', { name: 'Consultar historial de pagos', exact: true }).click()
-  const tabla = pagina.getByRole('table', { name: 'Obligaciones para consultar historial' })
-  const botones = tabla.getByRole('button', { name: /^Ver historial de / })
-  const busqueda = pagina.getByLabel('Buscar obligaciones', { exact: true })
-  await expect(botones).toHaveCount(3)
-  await expect(tabla.getByRole('row').filter({ hasText: 'Préstamo cancelado' })).toContainText('Pagado')
-  await expect(pagina.getByRole('list', { name: 'Historial de abonos' })).toHaveCount(0)
-
-  await busqueda.fill('PRESTAMO prueba 8')
-  await expect(botones).toHaveCount(1)
-  const pagada = tabla.getByRole('button', { name: 'Ver historial de Préstamo cancelado (#8)', exact: true })
-  await pagada.focus()
-  await pagina.keyboard.press('Enter')
-  await expect(pagada).toHaveAttribute('aria-pressed', 'true')
-  await expect(resumen(pagina, 'Concepto de la obligación')).toHaveText('Préstamo cancelado')
-  await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 200.00')
-
-  const consultasAntesDeFiltrar = escenario.solicitudes.filter(({ camino }) => camino === '/api/obligaciones/8/historial').length
-  await busqueda.fill('proveedor abonos')
-  await expect(botones).toHaveCount(1)
-  await expect(botones).toHaveAccessibleName('Ver historial de Proveedor con abonos (#7)')
-  await expect(resumen(pagina, 'Concepto de la obligación')).toHaveText('Préstamo cancelado')
-  await busqueda.fill('sin coincidencias')
-  await expect(botones).toHaveCount(0)
-  await expect(pagina.getByText('No hay obligaciones que coincidan con la búsqueda.', { exact: true })).toBeVisible()
-  await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 200.00')
-  await pagina.getByRole('button', { name: 'Limpiar búsqueda', exact: true }).click()
-  await expect(busqueda).toHaveValue('')
-  await expect(botones).toHaveCount(3)
-  await expect(pagada).toHaveAttribute('aria-pressed', 'true')
-  expect(escenario.solicitudes.filter(({ camino }) => camino === '/api/obligaciones/8/historial')).toHaveLength(consultasAntesDeFiltrar)
-
-  await tabla.getByRole('row').filter({ hasText: 'Proveedor con abonos' }).getByRole('cell').first().click()
-  await expect(tabla.getByRole('button', { name: 'Ver historial de Proveedor con abonos (#7)', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(resumen(pagina, 'Concepto de la obligación')).toHaveText('Proveedor con abonos')
-  await expect(pagina.getByRole('list', { name: 'Historial de abonos' }).getByRole('listitem')).toHaveCount(2)
-  expect(escenario.solicitudes.filter(({ metodo, camino }) => metodo !== 'GET' && camino !== '/api/auth/login')).toEqual([])
-})
-
-test('el filtro de mes y año se combina con la búsqueda sin consultar otra vez la API y conserva ambos al actualizar', async ({ page: pagina }) => {
-  const escenario = crearEscenario()
-  escenario.obligaciones.forEach((obligacion, indice) => {
-    obligacion.beneficiario = 'Empresa Ándes'
-    obligacion.fecha_limite = ['2026-10-31', '2026-09-30', '2027-10-01'][indice]
-  })
-  await simularApi(pagina, escenario)
-  await abrirHistorial(pagina)
-  await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 1,500.00')
-  const solicitudesAntesDeFiltrar = [...escenario.solicitudes]
-  await expect(pagina.getByLabel('Filtrar por estado', { exact: true })).toHaveCount(0)
-  const filtro = pagina.getByLabel('Filtrar por mes', { exact: true })
-  const busqueda = pagina.getByLabel('Buscar obligaciones', { exact: true })
-  const botones = pagina.getByRole('table', { name: 'Obligaciones para consultar historial' }).getByRole('button', { name: /^Ver historial de / })
-  await expect(filtro).toHaveValue('')
-  await expect(filtro.getByRole('option')).toHaveText(['Todos los meses', 'octubre de 2027', 'octubre de 2026', /^se(?:p)?tiembre de 2026$/])
-  await busqueda.fill('EMPRESA andes')
-  await expect(botones).toHaveCount(3)
-
-  await filtro.selectOption('2026-09')
-  await expect(botones).toHaveCount(1)
-  await expect(botones).toHaveAccessibleName('Ver historial de Préstamo cancelado (#8)')
-  await expect(pagina.getByText(/Esta obligación no coincide con los filtros actuales\./)).toBeVisible()
-  await expect(resumen(pagina, 'Concepto de la obligación')).toHaveText('Proveedor con abonos')
-  await filtro.focus()
-  await pagina.keyboard.press('Home')
-  await expect(filtro).toHaveValue('')
-  await expect(busqueda).toHaveValue('EMPRESA andes')
-  await expect(botones).toHaveCount(3)
-  await expect(pagina.getByText(/Esta obligación no coincide con los filtros actuales\./)).toHaveCount(0)
-
-  await filtro.selectOption('2027-10')
-  await expect(botones).toHaveCount(1)
-  await expect(botones).toHaveAccessibleName('Ver historial de Compromiso sin pagos (#9)')
-  await filtro.selectOption('2026-10')
-  await expect(botones).toHaveCount(1)
-  await expect(botones).toHaveAccessibleName('Ver historial de Proveedor con abonos (#7)')
-  await filtro.selectOption('2026-09')
-  await busqueda.fill('proveedor')
-  await expect(botones).toHaveCount(0)
-  await expect(pagina.getByText('No hay obligaciones que coincidan con la búsqueda y el mes seleccionado.', { exact: true })).toBeVisible()
-  await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 1,500.00')
-  await pagina.getByRole('button', { name: 'Limpiar búsqueda', exact: true }).click()
-  await expect(busqueda).toHaveValue('')
-  await expect(filtro).toHaveValue('2026-09')
-  await expect(botones).toHaveCount(1)
-  await expect(botones).toHaveAccessibleName('Ver historial de Préstamo cancelado (#8)')
-  expect(escenario.solicitudes).toEqual(solicitudesAntesDeFiltrar)
-
-  await busqueda.fill('EMPRESA andes')
-  await pagina.getByRole('button', { name: 'Actualizar obligaciones', exact: true }).click()
-  await expect(botones).toHaveCount(1)
-  await expect(filtro).toHaveValue('2026-09')
-  await expect(busqueda).toHaveValue('EMPRESA andes')
-  await expect(botones).toHaveAccessibleName('Ver historial de Préstamo cancelado (#8)')
-  const consultasIniciales = solicitudesAntesDeFiltrar.filter(({ camino }) => camino === '/api/obligaciones').length
-  await pagina.screenshot({ path: '.local/historial-filtro-mes-desktop.png' })
-  expect(escenario.solicitudes.filter(({ camino }) => camino === '/api/obligaciones')).toHaveLength(consultasIniciales + 1)
-  expect(escenario.solicitudes.filter(({ metodo, camino }) => metodo !== 'GET' && camino !== '/api/auth/login')).toEqual([])
-})
-
-test('en móvil la tabla y el filtro de mes no desbordan la página', async ({ page: pagina }) => {
+test('consulta el historial pagado de otro mes desde sus detalles en móvil, sin acceso separado al historial', async ({ page: pagina }) => {
   await pagina.setViewportSize({ width: 390, height: 844 })
   const escenario = crearEscenario()
+  escenario.obligaciones[1].fecha_limite = '2026-09-30'
   await simularApi(pagina, escenario)
-  await abrirHistorial(pagina)
-  const tabla = pagina.getByRole('table', { name: 'Obligaciones para consultar historial' })
-  await expect(tabla).toBeVisible()
-  expect(await pagina.getByRole('region', { name: 'Tabla de obligaciones', exact: true }).evaluate((elemento) => elemento.scrollWidth > elemento.clientWidth)).toBe(true)
-  await expect(pagina.getByRole('list', { name: 'Historial de abonos' }).getByRole('listitem')).toHaveCount(2)
-  expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
-  const busqueda = pagina.getByLabel('Buscar obligaciones', { exact: true })
-  await busqueda.fill('PRESTAMO')
-  const filtro = pagina.getByLabel('Filtrar por mes', { exact: true })
-  await filtro.selectOption('2026-10')
-  const pagada = tabla.getByRole('button', { name: 'Ver historial de Préstamo cancelado (#8)', exact: true })
-  await pagada.focus()
-  await pagina.keyboard.press('Space')
-  await expect(pagada).toHaveAttribute('aria-pressed', 'true')
-  await expect(resumen(pagina, 'Saldo pendiente actual')).toHaveText('S/ 0.00')
-  await filtro.focus()
-  await pagina.keyboard.press('Home')
-  await expect(filtro).toHaveValue('')
-  await expect(busqueda).toHaveValue('PRESTAMO')
-  await expect(pagada).toHaveAttribute('aria-pressed', 'true')
-  await pagina.screenshot({ path: '.local/historial-filtro-mes-mobile.png', fullPage: true })
-  expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+  await expect(pagina.getByRole('button', { name: 'Consultar historial de pagos', exact: true })).toHaveCount(0)
+  const selector = pagina.getByRole('combobox', { name: 'Mes de los pagos' })
+  await selector.selectOption('09')
+  await seleccionarObligacion(pagina, '8')
+  await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 200.00')
+  await expect(pagina.getByRole('list', { name: 'Historial de abonos' }).getByRole('listitem')).toHaveCount(1)
+  await expect(pagina.getByRole('button', { name: 'Registrar pago', exact: true })).toHaveCount(0)
+  await pagina.getByRole('button', { name: 'Cerrar detalles', exact: true }).click()
+  await expect(selector).toHaveValue('09')
+  expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  expect(escenario.solicitudes.filter(({ metodo, camino }) => metodo !== 'GET' && camino !== '/api/auth/login')).toEqual([])
 })

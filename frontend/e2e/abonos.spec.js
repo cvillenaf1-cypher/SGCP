@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { abrirBasePruebas } from '../../backend/test/support/database.js'
+import { fechaActualNegocio } from '../../backend/src/obligaciones/consulta.js'
 
 const concepto = `Abono HU-03 ${randomUUID()}`
 let usuario
@@ -13,7 +14,7 @@ test.beforeAll(async ({ request: solicitudes }) => {
   const sesion = await acceso.json()
   const respuesta = await solicitudes.post('http://127.0.0.1:3001/api/obligaciones', {
     headers: { Authorization: `Bearer ${sesion.token}` },
-    data: { concepto, beneficiario: 'Proveedor de prueba', monto: '120.50', fecha_limite: '2026-10-30' },
+    data: { concepto, beneficiario: 'Proveedor de prueba', monto: '120.50', fecha_limite: fechaActualNegocio() },
   })
   expect(respuesta.status()).toBe(201)
   identificador = (await respuesta.json()).obligacion.id

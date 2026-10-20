@@ -1,19 +1,22 @@
 # Inicio compartido: pagos del mes y registro directo
 
-El gerente y el asistente ven automáticamente los compromisos del mes actual y
-las obligaciones anteriores con saldo pendiente. La pantalla usa el calendario
-de `America/Lima` y la fecha de vencimiento, sin filtros superiores.
+El gerente y el asistente ven automáticamente los compromisos del mes actual.
+Sobre el título **Pagos del mes**, un selector permite elegir entre enero y
+diciembre, sin selector de año. Se usa el año actual del calendario de
+`America/Lima` y la fecha de vencimiento de cada obligación.
 
 ## Comportamiento
 
-- Incluye todas las obligaciones del mes, incluso las pagadas.
-- Incluye vencidas de meses anteriores mientras tengan saldo.
-- Excluye futuras y antiguas pagadas del inicio; el historial conserva los datos.
+- Incluye todas las obligaciones del mes seleccionado, incluso las pagadas.
+- Permite consultar meses anteriores o futuros del año actual, sin mezclar períodos.
+- Elegir un mes actualiza la tabla inmediatamente, sin pulsar Actualizar listado.
 - Ordena vencidas, pendientes/parciales del mes y pagadas; desempata por fecha e ID.
 - Muestra concepto, beneficiario, importe original, saldo, vencimiento y estado.
 - Conserva el estado económico y muestra el vencimiento como condición adicional.
 - Las etiquetas muestran solo Pendiente, Parcial, Pagado o Vencida, sin explicaciones añadidas.
-- Actualiza el período al cambiar el día en Lima, también al recuperar el foco.
+- Revisa la fecha cada minuto y al recuperar el foco. Al cambiar el mes o el año
+  del calendario vuelve automáticamente al mes actual; un cambio de día conserva
+  el mes elegido manualmente.
 
 Cada fila tiene un único botón **Ver detalles**, que abre una ventana modal con
 los datos de la obligación, su saldo y el historial de abonos y comprobantes.
@@ -33,8 +36,9 @@ En la cabecera del detalle, junto al título y al cierre, el asistente puede pul
 **Registrar pago** si queda saldo pendiente. El formulario se abre en la parte
 superior de la ventana, antes del resumen y el historial, con los campos existentes:
 monto, medio de pago y comprobante opcional. No vuelve a seleccionar
-la obligación. El menú conserva únicamente **Pagos del mes** y **Consultar historial
-de pagos**; se elimina el acceso duplicado **Registrar pagos realizados**.
+la obligación. El menú conserva únicamente **Pagos del mes**. Los pagos anteriores
+y sus comprobantes se consultan dentro de **Ver detalles**, sin accesos separados
+para consultar el historial o registrar pagos realizados.
 Se conserva el endpoint monetario, la validación de céntimos,
 la transacción del backend y la clave de idempotencia durante un reintento.
 El formulario indica el saldo máximo a abonar y rechaza un importe superior,
@@ -43,7 +47,8 @@ bloqueo de fila para impedir excesos cuando hay registros simultáneos.
 Una obligación ya pagada permite consultar su historial, sin ofrecer otro pago.
 
 Después del abono se actualizan el saldo, el estado, el listado y el historial.
-El panel permanece abierto cuando una deuda antigua se cancela y sale del listado.
+El panel permanece abierto al cancelar una deuda, y la fila continúa visible como
+pagada dentro del mes elegido.
 El registro monetario y el archivo mantienen confirmaciones independientes:
 un error de comprobante no deshace ni repite el abono.
 
@@ -61,11 +66,9 @@ Se habilitan para GERENTE únicamente las lecturas de detalle e historial existe
 El listado general mantiene sus filtros y resultados completos. Los POST de
 obligaciones, abonos y comprobantes siguen siendo exclusivos del ASISTENTE.
 
-Se conserva la consulta mensual histórica del gerente con su selector de período,
-además de las funciones secundarias del asistente y su historial general.
-El historial general del asistente permite buscar por concepto, beneficiario o
-número y filtrar por mes y año de vencimiento. Incluye todos los estados en cada
-período y ofrece **Todos los meses**; el filtro anterior por estado se retira.
+Se conserva la consulta mensual histórica independiente del gerente con su
+selector de período. En el inicio compartido se filtra únicamente por mes del año
+actual; el asistente consulta el historial desde los detalles de cada obligación.
 
 No se añaden aprobaciones empresariales ni verificaciones bancarias. Un comprobante
 es evidencia adjunta al registro, no una confirmación bancaria de autenticidad.

@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { abrirBasePruebas } from '../../backend/test/support/database.js'
+import { fechaActualNegocio } from '../../backend/src/obligaciones/consulta.js'
 
 const concepto = `Consulta HU-02 ${randomUUID()}`
+const fechaLimite = fechaActualNegocio()
 let identificador
 let usuario
 
@@ -13,7 +15,7 @@ test.beforeAll(async ({ request: solicitudes }) => {
   const sesion = await acceso.json()
   const respuesta = await solicitudes.post('http://127.0.0.1:3001/api/obligaciones', {
     headers: { Authorization: `Bearer ${sesion.token}` },
-    data: { concepto, beneficiario: 'Proveedor de prueba', monto: '120.50', fecha_limite: '2020-01-15' },
+    data: { concepto, beneficiario: 'Proveedor de prueba', monto: '120.50', fecha_limite: fechaLimite },
   })
   expect(respuesta.status()).toBe(201)
   identificador = (await respuesta.json()).obligacion.id
@@ -27,7 +29,7 @@ test.afterAll(async () => {
   } finally { await conexiones.end() }
 })
 
-test('ASISTENTE ve automáticamente una deuda vencida real, abre detalle y conserva la vista móvil', async ({ page: pagina }) => {
+test('ASISTENTE ve automáticamente una deuda del mes, abre detalle y conserva la vista móvil', async ({ page: pagina }) => {
   await pagina.goto('/#/login')
   await pagina.getByLabel('Correo electrónico').fill(usuario.email)
   await pagina.getByLabel('Contraseña', { exact: true }).fill(usuario.password)
@@ -35,12 +37,11 @@ test('ASISTENTE ve automáticamente una deuda vencida real, abre detalle y conse
   const fila = pagina.getByRole('row').filter({ hasText: concepto })
   await expect(fila).toBeVisible()
   await expect(fila.getByText('Pendiente', { exact: true })).toBeVisible()
-  await expect(fila.getByText('Vencida', { exact: true })).toBeVisible()
   await expect(fila.getByText('S/ 120.50', { exact: true })).toHaveCount(2)
   await fila.getByRole('button', { name: `Ver detalles de ${concepto} (#${identificador})`, exact: true }).click()
   const detalle = pagina.getByRole('dialog', { name: `Detalle de la obligación #${identificador}` })
   await expect(detalle.getByText(concepto, { exact: true }).first()).toBeVisible()
-  await expect(detalle.getByText('15/01/2020', { exact: true })).toBeVisible()
+  await expect(detalle.getByText(fechaLimite.split('-').reverse().join('/'), { exact: true })).toBeVisible()
   await expect(pagina.getByLabel('Filtrar pagos')).toHaveCount(0)
   await detalle.getByRole('button', { name: 'Cerrar detalles' }).click()
   await pagina.setViewportSize({ width: 390, height: 844 })

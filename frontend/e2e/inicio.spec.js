@@ -7,7 +7,7 @@ async function preparar(pagina, { rol = 'ASISTENTE', fallarArchivo = false, sinO
   const base = { beneficiario: 'Proveedor de prueba', monto_original: '100.00', saldo_pendiente: '100.00', fecha_limite: '2026-10-25', fecha_registro: '2026-09-01T15:00:00Z', estado_economico: 'PENDIENTE' }
   const obligaciones = sinObligaciones ? [] : [
     { ...base, id: 1, concepto: 'Servicio empresarial del mes' },
-    { ...base, id: 2, concepto: 'Abono parcial del mes', saldo_pendiente: '30.00', estado_economico: 'PARCIAL' },
+    { ...base, id: 2, concepto: 'Abono parcial del mes', saldo_pendiente: '30.00', estado_economico: 'PARCIAL', fecha_limite: '2026-10-01' },
     { ...base, id: 3, concepto: 'Obligación pagada del mes', saldo_pendiente: '0.00', estado_economico: 'PAGADO' },
     { ...base, id: 4, concepto: 'Deuda vencida de septiembre', fecha_limite: '2026-09-15' },
     { ...base, id: 5, concepto: 'Pagada antigua excluida', fecha_limite: '2026-09-01', saldo_pendiente: '0.00', estado_economico: 'PAGADO' },
@@ -82,13 +82,14 @@ test('inicio automático del asistente, detalles por teclado y presentación mó
   await preparar(pagina)
   const tabla = pagina.getByRole('table')
   await expect(pagina.getByRole('button', { name: 'Registrar pagos realizados', exact: true })).toHaveCount(0)
-  await expect(tabla.getByRole('row')).toHaveCount(5)
-  await expect(tabla).toContainText('Deuda vencida de septiembre')
+  await expect(pagina.getByRole('button', { name: 'Consultar historial de pagos', exact: true })).toHaveCount(0)
+  await expect(tabla.getByRole('row')).toHaveCount(4)
+  await expect(tabla).not.toContainText('Deuda vencida de septiembre')
   await expect(tabla).toContainText('Obligación pagada del mes')
   await expect(pagina.getByText('Pagada antigua excluida')).toHaveCount(0)
   await expect(pagina.getByText('Obligación futura excluida')).toHaveCount(0)
-  await expect(pagina.getByRole('combobox')).toHaveCount(0)
-  await expect(tabla.getByRole('button')).toHaveCount(5)
+  await expect(pagina.getByRole('combobox', { name: 'Mes de los pagos' })).toHaveValue('10')
+  await expect(tabla.getByRole('button')).toHaveCount(4)
   await expect(tabla.getByText('Pendiente', { exact: true }).first()).toBeVisible()
   await expect(tabla.getByText('Parcial', { exact: true })).toBeVisible()
   await expect(tabla.getByText('Vencida', { exact: true })).toBeVisible()
@@ -170,6 +171,7 @@ test('pago parcial y completo actualizan el mismo panel y conservan la obligaci�
 
 test('cancelar una deuda antigua mantiene la confirmación y permite reintentar solo el comprobante', async ({ page: pagina }) => {
   const { solicitudes } = await preparar(pagina, { fallarArchivo: true })
+  await pagina.getByRole('combobox', { name: 'Mes de los pagos' }).selectOption('09')
   await pagina.getByRole('button', { name: /Ver detalles.*\(#4\)/ }).click()
   const detalle = pagina.getByRole('dialog', { name: 'Detalle de la obligación #4' })
   await detalle.getByRole('button', { name: 'Registrar pago', exact: true }).click()
@@ -179,7 +181,7 @@ test('cancelar una deuda antigua mantiene la confirmación y permite reintentar 
   await detalle.getByRole('button', { name: 'Registrar abono' }).click()
   await expect(detalle.getByText('Abono registrado correctamente.')).toBeVisible()
   await expect(detalle.getByText(/El abono ya está registrado. Reintenta solo el comprobante/)).toBeVisible()
-  await expect(pagina.locator('table tbody tr').filter({ hasText: 'Deuda vencida de septiembre' })).toHaveCount(0)
+  await expect(pagina.locator('table tbody tr').filter({ hasText: 'Deuda vencida de septiembre' })).toContainText('Pagado')
   await expect(detalle.getByRole('button', { name: 'Cerrar detalles' })).toBeDisabled()
   await pagina.keyboard.press('Escape')
   await expect(detalle).toBeVisible()
@@ -189,7 +191,26 @@ test('cancelar una deuda antigua mantiene la confirmación y permite reintentar 
   await expect(detalle.getByRole('img', { name: 'Comprobante del abono #51' })).toBeVisible()
   expect(solicitudes.filter((entrada) => entrada.camino.endsWith('/abonos'))).toHaveLength(1)
   await detalle.getByRole('button', { name: 'Cerrar detalles' }).click()
-  await expect(pagina.getByRole('button', { name: 'Actualizar listado' })).toBeFocused()
+  await expect(pagina.getByRole('button', { name: /Ver detalles.*\(#4\)/ })).toBeFocused()
+})
+
+test('el selector de meses actualiza la tabla sin año ni recarga y permite consultar meses vacíos', async ({ page: pagina }) => {
+  const { solicitudes } = await preparar(pagina)
+  const mes = pagina.getByRole('combobox', { name: 'Mes de los pagos' })
+  await expect(mes.getByRole('option')).toHaveText(['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'])
+  const lecturas = solicitudes.filter((entrada) => entrada.camino === '/api/obligaciones').length
+  await mes.selectOption('09')
+  await expect(pagina.getByRole('table')).toContainText('Deuda vencida de septiembre')
+  await expect(pagina.getByRole('table')).toContainText('Pagada antigua excluida')
+  await expect(pagina.getByRole('table')).not.toContainText('Servicio empresarial del mes')
+  await mes.selectOption('11')
+  await expect(pagina.getByRole('table')).toContainText('Obligación futura excluida')
+  await mes.selectOption('01')
+  await expect(pagina.getByText('No hay obligaciones para el mes seleccionado.')).toBeVisible()
+  await expect(pagina.getByRole('button', { name: 'Agregar nueva deuda' })).toBeVisible()
+  await mes.selectOption('10')
+  await expect(pagina.getByRole('table')).toContainText('Obligación pagada del mes')
+  expect(solicitudes.filter((entrada) => entrada.camino === '/api/obligaciones')).toHaveLength(lecturas)
 })
 
 for (const sinObligaciones of [false, true]) {

@@ -9,6 +9,7 @@ import './PagosInicio.css'
 
 const etiquetasEstado = { PENDIENTE: 'Pendiente', PARCIAL: 'Parcial', PAGADO: 'Pagado' }
 const noBloquear = () => {}
+const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
 function EstadoPago({ obligacion }) {
   return <span className="inicio-estados">
@@ -141,6 +142,7 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, a
   const [seleccionado, establecerSeleccionado] = useState(null)
   const [bloqueada, establecerBloqueada] = useState(false)
   const [hoy, establecerHoy] = useState(fechaActualLima)
+  const [mesElegido, establecerMesElegido] = useState(null)
   const origenFoco = useRef(null)
   const botonActualizar = useRef(null)
 
@@ -190,9 +192,9 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, a
     destino?.focus()
   }
 
-  const obligaciones = seleccionarPagosInicio(consulta.obligaciones, hoy)
-  const periodo = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', month: 'long', year: 'numeric' })
-    .format(new Date(`${hoy}T12:00:00-05:00`))
+  const periodoActual = hoy.slice(0, 7)
+  const mes = mesElegido?.periodo === periodoActual ? mesElegido.mes : hoy.slice(5, 7)
+  const obligaciones = seleccionarPagosInicio(consulta.obligaciones, hoy, mes)
   const botonNuevaDeuda = puedeRegistrar && alNuevaDeuda && <button type="button" className="inicio-nueva-deuda"
     aria-label="Agregar nueva deuda" title="Registrar pago pendiente" disabled={bloqueada} onClick={alNuevaDeuda}>
     <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -201,16 +203,19 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, a
   </button>
   return <section className="pagos-inicio" aria-labelledby="titulo-pagos-inicio">
     <div className="inicio-encabezado">
-      <div><p className="inicio-periodo">{periodo}</p><h3 id="titulo-pagos-inicio">Pagos del mes</h3>
-        <p>Consulta los compromisos del mes actual y las deudas vencidas pendientes.</p></div>
+      <div><select className="inicio-periodo" aria-label="Mes de los pagos" value={mes} disabled={bloqueada}
+        onChange={(evento) => establecerMesElegido({ periodo: periodoActual, mes: evento.target.value })}>
+        {meses.map((nombre, indice) => <option key={nombre} value={String(indice + 1).padStart(2, '0')}>{nombre}</option>)}
+      </select><h3 id="titulo-pagos-inicio">Pagos del mes</h3>
+        <p>Consulta las obligaciones del mes seleccionado y abre sus detalles para ver los abonos.</p></div>
       <button ref={botonActualizar} type="button" className="secondary-button" disabled={consulta.cargando || bloqueada} onClick={actualizarListado}>Actualizar listado</button>
     </div>
     {consulta.cargando && <p role="status">{consulta.obligaciones.length ? 'Actualizando pagos del mes…' : 'Cargando pagos del mes…'}</p>}
     {consulta.error && <><p className="error-message" role="alert">{consulta.error}</p>
       <button type="button" disabled={bloqueada} onClick={actualizarListado}>Reintentar consulta</button></>}
     {obligaciones.length === 0 && botonNuevaDeuda && <div className="inicio-tabla-herramientas">{botonNuevaDeuda}</div>}
-    {!consulta.cargando && !consulta.error && obligaciones.length === 0 && <p className="empty-state" role="status">No hay obligaciones del mes ni deudas vencidas pendientes.</p>}
-    {obligaciones.length > 0 && <div className="inicio-tabla-contenedor" role="region" aria-label="Obligaciones del mes y vencidas" tabIndex={0}>
+    {!consulta.cargando && !consulta.error && obligaciones.length === 0 && <p className="empty-state" role="status">No hay obligaciones para el mes seleccionado.</p>}
+    {obligaciones.length > 0 && <div className="inicio-tabla-contenedor" role="region" aria-label="Obligaciones del mes" tabIndex={0}>
       <table className="inicio-tabla" role="table">
         <caption><div className="inicio-tabla-cabecera"><span>{obligaciones.length} obligación(es). Pulsa Ver detalles para consultar los datos y abonos del pago.</span>{botonNuevaDeuda}</div></caption>
         <thead role="rowgroup"><tr role="row">{['Concepto', 'Beneficiario', 'Monto original', 'Saldo pendiente', 'Vencimiento', 'Estado del pago', 'Acciones'].map((texto) => <th role="columnheader" key={texto} scope="col">{texto}</th>)}</tr></thead>
