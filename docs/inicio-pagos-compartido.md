@@ -33,7 +33,9 @@ En la cabecera del detalle, junto al título y al cierre, el asistente puede pul
 **Registrar pago** si queda saldo pendiente. El formulario se abre en la parte
 superior de la ventana, antes del resumen y el historial, con los campos existentes:
 monto, medio de pago y comprobante opcional. No vuelve a seleccionar
-la obligación. Se conserva el endpoint monetario, la validación de céntimos,
+la obligación. El menú conserva únicamente **Pagos del mes** y **Consultar historial
+de pagos**; se elimina el acceso duplicado **Registrar pagos realizados**.
+Se conserva el endpoint monetario, la validación de céntimos,
 la transacción del backend y la clave de idempotencia durante un reintento.
 El formulario indica el saldo máximo a abonar y rechaza un importe superior,
 incluido un exceso de un céntimo. El backend vuelve a verificar el saldo bajo
