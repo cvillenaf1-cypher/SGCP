@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom'
 import { PaginaPanel } from '../pages/DashboardPage'
 import { IconoGerente } from './IconoGerente'
+import { ResumenAlertasVencidas } from './ResumenAlertasVencidas'
+import { useAlertasVencidas } from './useAlertasVencidas'
 import './pagosDelMes.css'
 
 export function PaginaGerente() {
+  const consultaAlertas = useAlertasVencidas()
   return (
     <>
-      <PaginaPanel role="GERENTE" />
+      <PaginaPanel role="GERENTE" consultaPagos={consultaAlertas} avisos={<ResumenAlertasVencidas consulta={consultaAlertas} />} />
 
       <nav className="navegacion-gerente" aria-label="Consultas del gerente">
         <Link to="/gerente/pagos-del-mes">

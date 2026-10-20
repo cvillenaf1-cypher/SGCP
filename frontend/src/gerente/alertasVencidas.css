@@ -1,0 +1,48 @@
+.resumen-alertas {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 22px 0;
+  padding: 20px 24px;
+  border: 1px solid #c9e7dc;
+  border-left: 5px solid #008b61;
+  border-radius: 14px;
+  background: #eef9f4;
+  color: #041e38;
+}
+
+.resumen-alertas--vencidas {
+  border-color: #e4b6af;
+  border-left-color: #a32c20;
+  background: #fff3f0;
+}
+
+.resumen-alertas h3 { margin: 0 0 6px; font-size: 1rem; }
+.resumen-alertas p { margin: 4px 0; font-size: 0.88rem; }
+.resumen-alertas > a { margin-left: auto; color: #006747; font-weight: 700; }
+.resumen-alertas > .icono-gerente { color: #a32c20; }
+.encabezado-alertas { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.contador-alertas { padding: 8px 14px; border-radius: 100px; background: #fff0ed; color: #8b241b; font-weight: 700; }
+.lista-alertas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 12px 0 28px; padding: 0; list-style: none; }
+.tarjeta-alerta { height: 100%; padding: 22px; border: 1px solid #e4b6af; border-left: 5px solid #a32c20; border-radius: 14px; background: #fff8f6; }
+.tarjeta-alerta--hoy { border-color: #e6ce93; border-left-color: #956200; background: #fffaf0; }
+.cabecera-alerta { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 12px; }
+.cabecera-alerta h4 { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.estado-alerta { padding: 4px 10px; border-radius: 100px; color: #8b241b; background: #f9ded8; font-weight: 700; font-size: 0.8rem; }
+.tarjeta-alerta--hoy .estado-alerta { color: #714900; background: #f7e9c1; }
+.tarjeta-alerta dl { display: grid; gap: 14px; margin: 22px 0 0; }
+.tarjeta-alerta dl > div { display: grid; grid-template-columns: 1fr 1.3fr; gap: 12px; }
+.tarjeta-alerta dt { color: #52677b; font-size: 0.82rem; }
+.tarjeta-alerta dd { margin: 0; overflow-wrap: anywhere; }
+.saldo-alerta { font-weight: 800; font-variant-numeric: tabular-nums; }
+.avisos-del-dia { margin-top: 28px; }
+.avisos-del-dia > p, .nota-alertas { color: #52677b; font-size: 0.85rem; }
+.mensaje-alertas-vacio { padding: 24px; border: 1px solid #c9e7dc; border-radius: 14px; color: #006747; background: #eef9f4; }
+.alertas-vencidas button:focus-visible, .resumen-alertas a:focus-visible { outline: 3px solid #008b61; outline-offset: 4px; }
+
+@media (max-width: 760px) {
+  .lista-alertas { grid-template-columns: 1fr; }
+  .resumen-alertas { padding: 18px; }
+  .resumen-alertas > a { margin-left: 0; }
+}
