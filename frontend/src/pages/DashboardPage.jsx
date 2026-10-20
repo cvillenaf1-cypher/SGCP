@@ -3,7 +3,7 @@ import { useAutenticacion } from '../auth/useAuth'
 import { FuncionesAsistente } from '../components/FuncionesAsistente'
 import { PagosInicio } from '../components/PagosInicio'
 
-export function PaginaPanel({ role: rol, alBloquear }) {
+export function PaginaPanel({ role: rol, alBloquear, consultaPagos, avisos }) {
   const { solicitar } = useAutenticacion()
   const [estado, establecerEstado] = useState({ cargando: true, mensaje: '', error: '' })
   const esAsistente = rol === 'ASISTENTE'
@@ -23,7 +23,8 @@ export function PaginaPanel({ role: rol, alBloquear }) {
       </div>
       {estado.cargando && <p role="status">Verificando acceso con el servidor…</p>}
       {estado.error && <p className="error-message" role="alert">{estado.error}</p>}
-      {esAsistente ? <FuncionesAsistente alBloquear={alBloquear} /> : <PagosInicio />}
+      {!esAsistente && avisos}
+      {esAsistente ? <FuncionesAsistente alBloquear={alBloquear} /> : <PagosInicio consultaExterna={consultaPagos} />}
     </section>
   )
 }

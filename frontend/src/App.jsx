@@ -8,6 +8,7 @@ import { PaginaPanel } from './pages/DashboardPage'
 import { PaginaGerente } from './gerente/PaginaGerente'
 import { PaginaPagosDelMes } from './gerente/PaginaPagosDelMes'
 import { PaginaResumenMensual } from './gerente/PaginaResumenMensual'
+import { PaginaAlertasVencidas } from './gerente/PaginaAlertasVencidas'
 import './App.css'
 
 function Aplicacion() {
@@ -135,6 +136,10 @@ function Aplicacion() {
             <Route
               path="/gerente/resumen-mensual"
               element={<PaginaResumenMensual />}
+            />
+            <Route
+              path="/gerente/alertas-vencidas"
+              element={<PaginaAlertasVencidas />}
             />
           </Route>
 

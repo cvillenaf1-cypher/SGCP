@@ -94,9 +94,11 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
   </section>
 }
 
-export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear }) {
+export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, consultaExterna }) {
   const { solicitar } = useAutenticacion()
-  const [consulta, establecerConsulta] = useState({ cargando: true, obligaciones: [], error: '' })
+  const [consultaInterna, establecerConsulta] = useState({ cargando: true, obligaciones: [], error: '' })
+  const consulta = consultaExterna ?? consultaInterna
+  const usaConsultaExterna = Boolean(consultaExterna)
   const [intento, establecerIntento] = useState(0)
   const [seleccionado, establecerSeleccionado] = useState(null)
   const [bloqueada, establecerBloqueada] = useState(false)
@@ -112,6 +114,7 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear })
   }, [])
 
   useEffect(() => {
+    if (usaConsultaExterna) return undefined
     const controlador = new AbortController()
     solicitar('/api/obligaciones', { signal: controlador.signal })
       .then((datos) => {
@@ -122,7 +125,7 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear })
         if (!controlador.signal.aborted) establecerConsulta((actual) => ({ ...actual, cargando: false, error: error.message }))
       })
     return () => controlador.abort()
-  }, [solicitar, intento, hoy])
+  }, [solicitar, intento, hoy, usaConsultaExterna])
 
   const bloquear = useCallback((valor) => { establecerBloqueada(valor); alBloquear(valor) }, [alBloquear])
   useEffect(() => () => alBloquear(false), [alBloquear])
@@ -132,9 +135,10 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear })
       obligacion.id === obligacionActualizada.id ? obligacionActualizada : obligacion) }))
   }, [])
   const actualizarListado = useCallback(() => {
+    if (consultaExterna) { consultaExterna.actualizar(); return }
     establecerConsulta((actual) => ({ ...actual, cargando: true, error: '' }))
     establecerIntento((actual) => actual + 1)
-  }, [])
+  }, [consultaExterna])
 
   function seleccionar(obligacion, elemento) {
     if (bloqueada) return
@@ -150,9 +154,10 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear })
     destino?.focus()
   }
 
-  const obligaciones = seleccionarPagosInicio(consulta.obligaciones, hoy)
+  const fechaConsulta = consultaExterna?.hoy ?? hoy
+  const obligaciones = seleccionarPagosInicio(consulta.obligaciones, fechaConsulta)
   const periodo = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', month: 'long', year: 'numeric' })
-    .format(new Date(`${hoy}T12:00:00-05:00`))
+    .format(new Date(`${fechaConsulta}T12:00:00-05:00`))
   return <section className="pagos-inicio" aria-labelledby="titulo-pagos-inicio">
     <div className="inicio-encabezado">
       <div><p className="inicio-periodo">{periodo}</p><h3 id="titulo-pagos-inicio">Pagos del mes</h3>
