@@ -1,3 +1,5 @@
+import { aCentavos, MONTO_MAXIMO_CENTAVOS } from '../abonos/validacion.js'
+
 const CAMPOS_PERMITIDOS = ['concepto', 'beneficiario', 'monto', 'fecha_limite']
 
 function validarTexto(valor) {
@@ -5,9 +7,10 @@ function validarTexto(valor) {
 }
 
 function normalizarMonto(valor) {
-  // DECIMAL(13,2): hasta once enteros y dos decimales, siempre en soles (S/).
+  // Se conserva la precisión del almacenamiento; los registros nuevos se limitan a S/ 100,000.00.
   // Se trabaja con cadenas para no introducir redondeos de punto flotante.
   if (typeof valor !== 'string' || valor !== valor.trim() || !/^\d{1,11}(?:\.\d{1,2})?$/.test(valor) || !/[1-9]/.test(valor)) return null
+  if (aCentavos(valor) > MONTO_MAXIMO_CENTAVOS) return null
   const [enteros, decimales = ''] = valor.split('.')
   return `${enteros.replace(/^0+(?=\d)/, '')}.${decimales.padEnd(2, '0')}`
 }
@@ -30,7 +33,7 @@ export function validarObligacion(cuerpo) {
 
   if (!concepto || [...concepto].length > 255) campos.concepto = 'Ingresa un concepto de entre 1 y 255 caracteres.'
   if (!beneficiario || [...beneficiario].length > 255) campos.beneficiario = 'Ingresa un beneficiario de entre 1 y 255 caracteres.'
-  if (monto === null) campos.monto = 'Ingresa el monto en soles (S/) como cadena decimal, mayor que cero, con hasta dos decimales y máximo 99999999999.99.'
+  if (monto === null) campos.monto = 'Ingresa un monto mayor que cero, con hasta dos decimales y máximo S/ 100,000.00.'
   if (!esFechaValida(fechaLimite)) campos.fecha_limite = 'Ingresa una fecha válida en formato YYYY-MM-DD, entre 1000-01-01 y 9999-12-31.'
   if (!cuerpo || typeof cuerpo !== 'object' || Array.isArray(cuerpo) || Object.keys(cuerpo).some((clave) => !CAMPOS_PERMITIDOS.includes(clave))) {
     campos.form = 'Envía únicamente concepto, beneficiario, monto y fecha_limite.'

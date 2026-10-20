@@ -31,9 +31,30 @@ describe('Validaciones del pago pendiente', () => {
   it('permite una fecha pasada válida y un monto de dos decimales', () => {
     expect(validarFormulario(valoresValidos)).toEqual({})
   })
+  it('acepta exactamente S/ 100,000.00 y rechaza cualquier exceso, incluidos ceros iniciales', () => {
+    for (const montoOriginal of ['99999.99', '100000', '100000.0', '100000.00', '00000100000']) {
+      expect(validarFormulario({ ...valoresValidos, montoOriginal })).toEqual({})
+    }
+    for (const montoOriginal of ['100000.01', '100001', '00000100000.01', '99999999999.99']) {
+      expect(validarFormulario({ ...valoresValidos, montoOriginal }).montoOriginal).toBe('El monto no puede superar S/ 100,000.00.')
+    }
+  })
 })
 
 describe('Formulario de pago pendiente', () => {
+  it('impide enviar un importe mayor al máximo y permite corregirlo a S/ 100,000.00', async () => {
+    const solicitar = prepararFormulario(vi.fn().mockResolvedValue({ obligacion: { id: 88 } }))
+    fireEvent.change(screen.getByLabelText('Monto original (S/)'), { target: { value: '100000.01' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar pago pendiente' }))
+    expect(screen.getByText('El monto no puede superar S/ 100,000.00.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Monto original (S/)')).toHaveFocus()
+    expect(solicitar).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('Monto original (S/)'), { target: { value: '100000.00' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar pago pendiente' }))
+    await screen.findByText('Pago pendiente registrado correctamente.')
+    expect(solicitar).toHaveBeenCalledTimes(1)
+    expect(solicitar.mock.calls[0][1].body.monto).toBe('100000.00')
+  })
   it('renderiza campos, muestra errores específicos y enfoca el primer error sin enviar', () => {
     const solicitar = prepararFormulario()
     fireEvent.change(screen.getByLabelText('Concepto del pago'), { target: { value: ' ' } })

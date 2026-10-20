@@ -46,7 +46,7 @@ test('obligaciones: admite 255 caracteres y rechaza 256, incluidos caracteres Un
 test('obligaciones: normaliza soles con dos decimales sin perder centavos', () => {
   for (const [monto, esperado] of [
     ['1', '1.00'], ['120.5', '120.50'], ['0.01', '0.01'], ['0.1', '0.10'],
-    ['000000001.2', '1.20'], ['12345678901.23', '12345678901.23'], ['99999999999.99', '99999999999.99'],
+    ['000000001.2', '1.20'], ['99999.99', '99999.99'], ['100000', '100000.00'], ['100000.0', '100000.00'], ['100000.00', '100000.00'],
   ]) {
     const resultado = validarObligacion({ ...entradaValida, monto })
     assert.deepEqual(resultado.fields, {}, monto)
@@ -55,8 +55,8 @@ test('obligaciones: normaliza soles con dos decimales sin perder centavos', () =
   }
 })
 
-test('obligaciones: rechaza cero, negativos, más de dos decimales y exceso de DECIMAL(13,2)', () => {
-  for (const monto of ['0', '00', '0.0', '0.00', '-1', '-0.01', '1.001', '1.000', '0.001', '99999999999.999', '100000000000', '100000000000.00']) {
+test('obligaciones: rechaza cero, negativos, más de dos decimales e importes mayores de S/ 100,000.00', () => {
+  for (const monto of ['0', '00', '0.0', '0.00', '-1', '-0.01', '1.001', '1.000', '0.001', '100000.01', '100001', '00000100000.01', '99999999999.99', '99999999999.999', '100000000000', '100000000000.00']) {
     assert.ok(validarObligacion({ ...entradaValida, monto }).fields.monto, monto)
   }
 })

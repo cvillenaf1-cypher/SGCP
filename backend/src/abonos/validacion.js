@@ -1,4 +1,5 @@
 export const MEDIOS_PAGO = ['Efectivo', 'Transferencia bancaria', 'Tarjeta', 'Billetera digital']
+export const MONTO_MAXIMO_CENTAVOS = 10000000n
 
 export function aCentavos(monto) {
   const [soles, decimales = ''] = monto.split('.')
@@ -14,6 +15,8 @@ export function validarRegistroAbono(cuerpo) {
   let monto
   if (typeof cuerpo?.monto !== 'string' || !/^\d{1,11}(?:\.\d{1,2})?$/.test(cuerpo.monto) || aCentavos(cuerpo.monto) <= 0n) {
     campos.monto = 'Ingresa el monto en soles (S/) como cadena decimal positiva con hasta dos decimales.'
+  } else if (aCentavos(cuerpo.monto) > MONTO_MAXIMO_CENTAVOS) {
+    campos.monto = 'El monto no puede superar S/ 100,000.00.'
   } else monto = desdeCentavos(aCentavos(cuerpo.monto))
   if (!MEDIOS_PAGO.includes(cuerpo?.medio_pago)) campos.medio_pago = 'Selecciona un medio de pago válido.'
   if (typeof cuerpo?.clave_idempotencia !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(cuerpo.clave_idempotencia)) {

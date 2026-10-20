@@ -7,7 +7,7 @@ const valoresIniciales = { concepto: '', beneficiario: '', montoOriginal: '', fe
 const campos = [
   { nombre: 'concepto', etiqueta: 'Concepto del pago', ayuda: 'Describe el compromiso económico.', tipo: 'text' },
   { nombre: 'beneficiario', etiqueta: 'Beneficiario', ayuda: 'Persona o empresa a quien se debe pagar.', tipo: 'text' },
-  { nombre: 'montoOriginal', etiqueta: 'Monto original (S/)', ayuda: 'Mayor que cero. Usa punto y hasta dos decimales: 150.50.', tipo: 'text' },
+  { nombre: 'montoOriginal', etiqueta: 'Monto original (S/)', ayuda: 'Mayor que cero y máximo S/ 100,000.00. Usa punto y hasta dos decimales: 150.50.', tipo: 'text' },
   { nombre: 'fechaLimite', etiqueta: 'Fecha límite', ayuda: 'Puedes registrar obligaciones con una fecha límite pasada.', tipo: 'date' },
 ]
 

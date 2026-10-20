@@ -160,6 +160,8 @@ test('registro: datos inválidos devuelven 422 y no se insertan', async () => {
     { ...entrada, beneficiario: 'x'.repeat(256) },
     { ...entrada, monto: '0' },
     { ...entrada, monto: '120.501' },
+    { ...entrada, monto: '100000.01' },
+    { ...entrada, monto: '99999999999.99' },
     { ...entrada, monto: 120.5 },
     { ...entrada, fecha_limite: '2025-02-29' },
   ]) {

@@ -59,8 +59,19 @@ test('abonos: validación rechaza importes inválidos, medio, clave y campos con
 test('abonos: cálculo exacto incluso en el límite DECIMAL(13,2)', () => {
   assert.equal(desdeCentavos(aCentavos('0.30') - aCentavos('0.10')), '0.20')
   assert.equal(desdeCentavos(aCentavos('99999999999.99') - aCentavos('0.01')), '99999999999.98')
-  assert.equal(validarRegistroAbono({ ...entrada, monto: '99999999999.99' }).monto, '99999999999.99')
+  assert.ok(validarRegistroAbono({ ...entrada, monto: '99999999999.99' }).fields.monto)
   assert.equal(validarRegistroAbono({ ...entrada, monto: '1' }).monto, '1.00')
+})
+
+test('abonos: acepta hasta S/ 100,000.00 y rechaza el exceso de un céntimo', () => {
+  for (const monto of ['99999.99', '100000', '100000.0', '100000.00', '00000100000']) {
+    assert.deepEqual(validarRegistroAbono({ ...entrada, monto }).fields, {})
+  }
+  for (const monto of ['100000.01', '00000100000.01', '100001', '99999999999.99']) {
+    const resultado = validarRegistroAbono({ ...entrada, monto })
+    assert.equal(resultado.fields.monto, 'El monto no puede superar S/ 100,000.00.')
+    assert.equal(resultado.monto, undefined)
+  }
 })
 
 test('abonos: parcial y completo confirman una única transacción y conservan estados HU-02', async () => {
