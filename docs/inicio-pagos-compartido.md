@@ -36,7 +36,7 @@ al botón de origen o a **Actualizar listado** si la fila ya no está visible.
 
 El asistente registra nuevas deudas desde el icono **+** en la esquina superior
 derecha de la tabla. También está disponible cuando todavía no hay obligaciones.
-Abre el formulario existente de pago pendiente; **Volver a pagos del mes** recarga
+Abre el formulario existente de pago pendiente; **Pagos del mes**, en el menú, recarga
 el listado para mostrar los registros del período. Este acceso reemplaza el botón
 de registro de pagos pendientes del menú. El gerente no dispone de este control.
 

@@ -10,9 +10,6 @@ export function FuncionesAsistente({ alBloquear }) {
     <nav className="consulta-navegacion" aria-label="Funciones del asistente">
       <button type="button" disabled={bloqueada} className="secondary-button" aria-pressed={vista === 'consulta'} onClick={() => establecerVista('consulta')}>Pagos del mes</button>
     </nav>
-    {vista === 'registro' ? <>
-      <button type="button" className="secondary-button" onClick={() => establecerVista('consulta')}>Volver a pagos del mes</button>
-      <FormularioPagoPendiente />
-    </> : <PagosInicio puedeRegistrar alBloquear={bloquear} alNuevaDeuda={() => establecerVista('registro')} />}
+    {vista === 'registro' ? <FormularioPagoPendiente /> : <PagosInicio puedeRegistrar alBloquear={bloquear} alNuevaDeuda={() => establecerVista('registro')} />}
   </>
 }
