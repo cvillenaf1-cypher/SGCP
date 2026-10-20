@@ -4,6 +4,10 @@ import { ContextoAutenticacion } from '../auth/AuthContext'
 import { PagosInicio } from '../components/PagosInicio'
 import { fechaActualLima, seleccionarPagosInicio } from '../lib/pagosInicio'
 
+// jsdom no implementa el diálogo nativo; el aislamiento y el foco se verifican en Playwright.
+HTMLDialogElement.prototype.showModal = function () { this.open = true }
+HTMLDialogElement.prototype.close = function () { this.open = false }
+
 const obligacion = { id: 1, concepto: 'Servicio de internet', beneficiario: 'Proveedor empresarial', monto_original: '100.00', saldo_pendiente: '100.00', fecha_limite: '2026-10-25', fecha_registro: '2026-09-01T15:00:00Z', estado_economico: 'PENDIENTE', vencida: false }
 const datos = [
   obligacion,
@@ -23,9 +27,9 @@ beforeEach(() => {
 })
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 
-function preparar({ obligaciones = datos, puedeRegistrar = true, registrar, cargar, consultarDetalle, fallarTrasRegistro = false } = {}) {
+function preparar({ obligaciones = datos, abonosIniciales = [], puedeRegistrar = true, registrar, cargar, consultarDetalle, fallarTrasRegistro = false } = {}) {
   const filas = structuredClone(obligaciones)
-  const abonos = []
+  const abonos = structuredClone(abonosIniciales)
   const solicitar = vi.fn(async (ruta, opciones = {}) => {
     if (fallarTrasRegistro && abonos.length && (ruta === '/api/obligaciones' || /^\/api\/obligaciones\/\d+$/.test(ruta))) throw new Error('Consulta temporalmente no disponible')
     if (ruta === '/api/obligaciones') return { obligaciones: structuredClone(filas) }
@@ -63,12 +67,14 @@ function preparar({ obligaciones = datos, puedeRegistrar = true, registrar, carg
 
 async function abrir(id = 1) {
   fireEvent.click(await screen.findByRole('button', { name: new RegExp(`Ver detalles.*\\(#${id}\\)$`) }))
-  const panel = screen.getByRole('region', { name: `Detalle de la obligación #${id}` })
+  const panel = screen.getByRole('dialog', { name: `Detalle de la obligación #${id}` })
   await within(panel).findByText('Beneficiario')
   return panel
 }
 
 async function completar(monto = '25.00') {
+  const registrar = screen.queryByRole('button', { name: 'Registrar pago', exact: true })
+  if (registrar) fireEvent.click(registrar)
   fireEvent.change(await screen.findByLabelText('Monto del abono (S/)'), { target: { value: monto } })
   fireEvent.change(screen.getByLabelText('Medio de pago'), { target: { value: 'Efectivo' } })
 }
@@ -103,20 +109,25 @@ describe('Consulta inicial compartida y detalles', () => {
     expect(screen.queryByText('Deuda futura')).not.toBeInTheDocument()
     expect(screen.queryByText('Pagada antigua')).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    for (const fila of within(tabla).getAllByRole('row').slice(1)) {
+      expect(within(fila).getAllByRole('button')).toHaveLength(1)
+      expect(within(fila).getByRole('button', { name: /Ver detalles/ })).toHaveAttribute('aria-haspopup', 'dialog')
+    }
+    expect(screen.queryByRole('button', { name: /Registrar pago/ })).not.toBeInTheDocument()
   })
 
   it('abre por fila y botón, muestra datos y permite cerrar con Escape devolviendo el foco', async () => {
     preparar()
     const boton = await screen.findByRole('button', { name: /Ver detalles.*\(#4\)/ })
     fireEvent.click(boton.closest('tr'))
-    const panel = await screen.findByRole('region', { name: 'Detalle de la obligación #4' })
+    const panel = await screen.findByRole('dialog', { name: 'Detalle de la obligación #4' })
     await within(panel).findByText('15/09/2026')
     expect(within(panel).getByText('Proveedor empresarial')).toBeInTheDocument()
     expect(within(panel).getByText('Parcial · con saldo')).toBeInTheDocument()
     expect(within(panel).getByText('Vencida · pendiente de cancelar')).toBeInTheDocument()
     expect(within(panel).getByRole('heading', { name: 'Detalle de la obligación #4' })).toHaveFocus()
     fireEvent.keyDown(panel, { key: 'Escape' })
-    expect(screen.queryByRole('region', { name: 'Detalle de la obligación #4' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Detalle de la obligación #4' })).not.toBeInTheDocument()
     expect(boton).toHaveFocus()
     await abrir(4)
   })
@@ -126,6 +137,7 @@ describe('Consulta inicial compartida y detalles', () => {
     const panel = await abrir(3)
     expect(within(panel).getByText(/Esta obligación ya está pagada/)).toBeInTheDocument()
     expect(within(panel).queryByLabelText('Monto del abono (S/)')).not.toBeInTheDocument()
+    expect(within(panel).queryByRole('button', { name: 'Registrar pago', exact: true })).not.toBeInTheDocument()
   })
 
   it('GERENTE ve los mismos compromisos y detalles sin controles de escritura', async () => {
@@ -151,14 +163,15 @@ describe('Consulta inicial compartida y detalles', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Ver detalles/ }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Detalle no disponible')
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar detalle' }))
-    expect(await screen.findByLabelText('Monto del abono (S/)')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Registrar pago', exact: true })).toBeInTheDocument()
   })
 })
 
 describe('Registro directo y comprobantes', () => {
-  it('el botón de pago abre el formulario sin seleccionar de nuevo la deuda y actualiza saldo e historial', async () => {
+  it('abre el registro desde el detalle sin seleccionar de nuevo la deuda y actualiza saldo e historial', async () => {
     const { solicitar } = preparar({ obligaciones: [obligacion] })
-    fireEvent.click(await screen.findByRole('button', { name: /Registrar pago de/ }))
+    const panel = await abrir()
+    expect(within(panel).queryByLabelText('Monto del abono (S/)')).not.toBeInTheDocument()
     await completar()
     expect(screen.queryByLabelText('Pago pendiente')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
@@ -172,6 +185,25 @@ describe('Registro directo y comprobantes', () => {
     expect(fila).toHaveTextContent('Parcial · con saldo')
     expect(await screen.findByRole('list', { name: 'Historial de abonos' })).toHaveTextContent('S/ 25.00')
     expect(solicitar.mock.calls.find(([ruta]) => ruta.endsWith('/abonos'))[1].body).toEqual({ monto: '25.00', medio_pago: 'Efectivo', clave_idempotencia: expect.any(String) })
+  })
+
+  it('muestra los abonos anteriores y limita el nuevo pago al saldo restante dentro del diálogo', async () => {
+    const anterior = { id: 40, obligacion_id: 2, monto: '70.00', medio_pago: 'Tarjeta', fecha_registro: '2026-10-19T16:00:00Z', tiene_comprobante: false }
+    const { solicitar } = preparar({ obligaciones: [datos[1]], abonosIniciales: [anterior] })
+    const panel = await abrir(2)
+    expect(await within(panel).findByRole('list', { name: 'Historial de abonos' })).toHaveTextContent('S/ 70.00')
+    expect(within(panel).queryByLabelText('Monto del abono (S/)')).not.toBeInTheDocument()
+    await completar('30.01')
+    expect(within(panel).getByText('Máximo a abonar:', { exact: false })).toHaveTextContent('S/ 30.00')
+    fireEvent.click(within(panel).getByRole('button', { name: 'Registrar abono' }))
+    expect(within(panel).getByText('El abono no puede superar el saldo pendiente.')).toBeInTheDocument()
+    expect(solicitar.mock.calls.filter(([, opciones]) => opciones?.method === 'POST')).toHaveLength(0)
+    await completar('30.00')
+    fireEvent.click(within(panel).getByRole('button', { name: 'Registrar abono' }))
+    expect(await within(panel).findByText(/Esta obligación ya está pagada/)).toBeInTheDocument()
+    await waitFor(() => expect(within(panel).getByRole('list', { name: 'Historial de abonos' }).children).toHaveLength(2))
+    expect(within(panel).queryByLabelText('Monto del abono (S/)')).not.toBeInTheDocument()
+    expect(solicitar.mock.calls.filter(([, opciones]) => opciones?.method === 'POST')).toHaveLength(1)
   })
 
   it('mantiene una obligación del mes visible después de cancelarla y bloquea nuevos abonos', async () => {

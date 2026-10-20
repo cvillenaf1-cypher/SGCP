@@ -19,13 +19,25 @@ function EstadoPago({ obligacion }) {
 
 function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegistrar, alBloquear, alCerrar }) {
   const { solicitar } = useAutenticacion()
-  const [consulta, establecerConsulta] = useState({ cargando: true, obligacion: null, error: '', permitiaAbonos: false })
+  const [consulta, establecerConsulta] = useState({ cargando: true, obligacion: null, error: '' })
   const [intento, establecerIntento] = useState(0)
   const [bloqueada, establecerBloqueada] = useState(false)
   const [versionHistorial, establecerVersionHistorial] = useState(0)
+  const [mostrarRegistro, establecerMostrarRegistro] = useState(false)
+  const dialogo = useRef(null)
   const titulo = useRef(null)
 
-  useEffect(() => { titulo.current.focus() }, [])
+  useEffect(() => {
+    const ventana = dialogo.current
+    const desbordamientoAnterior = document.body.style.overflow
+    ventana.showModal()
+    document.body.style.overflow = 'hidden'
+    titulo.current.focus()
+    return () => {
+      ventana.close()
+      document.body.style.overflow = desbordamientoAnterior
+    }
+  }, [])
 
   useEffect(() => {
     const controlador = new AbortController()
@@ -34,7 +46,7 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
         if (!esObligacionValida(datos?.obligacion) || datos.obligacion.id !== identificador) throw new Error('El servidor no devolvió un detalle válido de la obligación.')
         if (!controlador.signal.aborted) {
           const obligacion = actualizarEstadoObligacion(datos.obligacion)
-          establecerConsulta({ cargando: false, obligacion, error: '', permitiaAbonos: convertirACentimos(obligacion.saldo_pendiente) > 0n })
+          establecerConsulta({ cargando: false, obligacion, error: '' })
           alActualizar(obligacion)
         }
       })
@@ -58,14 +70,32 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
     alRegistrar()
   }, [alRegistrar])
 
+  function cerrar() {
+    if (bloqueada) return
+    dialogo.current.close()
+    alCerrar()
+  }
+
   const obligacion = consulta.obligacion
-  return <section className="inicio-detalle" aria-labelledby="titulo-detalle-inicio" id="detalle-obligacion-inicio"
+  return <dialog ref={dialogo} className="inicio-detalle" aria-labelledby="titulo-detalle-inicio" id="detalle-obligacion-inicio"
+    onCancel={(evento) => { evento.preventDefault(); cerrar() }}
     onKeyDown={(evento) => {
-      if (evento.key === 'Escape' && !bloqueada) { evento.stopPropagation(); alCerrar() }
+      if (evento.key === 'Escape') { evento.preventDefault(); evento.stopPropagation(); cerrar() }
+      if (evento.key === 'Tab') {
+        const controles = [...evento.currentTarget.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')]
+          .filter((elemento) => elemento.getClientRects().length > 0)
+        const primero = controles[0]
+        const ultimo = controles.at(-1)
+        if (evento.shiftKey && (document.activeElement === primero || document.activeElement === titulo.current)) {
+          evento.preventDefault(); (ultimo || titulo.current).focus()
+        } else if (!evento.shiftKey && (document.activeElement === ultimo || !primero)) {
+          evento.preventDefault(); (primero || titulo.current).focus()
+        }
+      }
     }}>
     <div className="inicio-detalle-encabezado">
       <h3 ref={titulo} tabIndex={-1} id="titulo-detalle-inicio">Detalle de la obligación #{identificador}</h3>
-      <button type="button" className="secondary-button" disabled={bloqueada} onClick={alCerrar}>Cerrar detalles</button>
+      <button type="button" className="secondary-button" disabled={bloqueada} onClick={cerrar}>Cerrar detalles</button>
     </div>
     {bloqueada && <p className="notice" role="status">Hay un registro o una confirmación pendiente. Resuélvelo antes de cerrar el detalle.</p>}
     {consulta.cargando && <p role="status">Cargando detalle…</p>}
@@ -82,16 +112,18 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
         <div><dt>Fecha de vencimiento</dt><dd>{formatearFechaObligacion(obligacion.fecha_limite)}</dd></div>
         <div><dt>Estado del pago</dt><dd><EstadoPago obligacion={obligacion} /></dd></div>
       </dl>
-      {puedeRegistrar && consulta.permitiaAbonos ? <section className="inicio-registro" aria-labelledby="titulo-pago-directo">
-        <h4 id="titulo-pago-directo">Registrar pago realizado</h4>
-        <p>Registra el importe que ya pagaste fuera de SGCP. Puedes abonar una parte o cancelar todo el saldo.</p>
-        <DatosObligacionAbono identificador={identificador} alBloquear={bloquear} alActualizarObligacion={actualizarObligacion}
-          alRegistrar={actualizarTrasRegistro} mostrarResumen={false} />
-      </section> : obligacion.estado_economico === 'PAGADO' && <p className="notice">Esta obligación ya está pagada. Puedes consultar sus pagos y comprobantes debajo.</p>}
       <h4 className="inicio-titulo-historial">Pagos y comprobantes</h4>
       <ConsultaHistorialObligacion identificador={identificador} actualizacion={versionHistorial} />
+      {obligacion.estado_economico === 'PAGADO' && !mostrarRegistro && <p className="notice">Esta obligación ya está pagada. Puedes consultar sus pagos y comprobantes.</p>}
+      {puedeRegistrar && (convertirACentimos(obligacion.saldo_pendiente) > 0n || mostrarRegistro) && <section className="inicio-registro" aria-labelledby="titulo-pago-directo">
+        <h4 id="titulo-pago-directo">Registrar pago realizado</h4>
+        {convertirACentimos(obligacion.saldo_pendiente) > 0n && <p>Puedes abonar una parte o cancelar el saldo restante. El importe no puede superar {formatearImporte(obligacion.saldo_pendiente)}.</p>}
+        {mostrarRegistro ? <DatosObligacionAbono identificador={identificador} alBloquear={bloquear} alActualizarObligacion={actualizarObligacion}
+          alRegistrar={actualizarTrasRegistro} mostrarResumen={false} />
+          : <button type="button" onClick={() => establecerMostrarRegistro(true)}>Registrar pago</button>}
+      </section>}
     </>}
-  </section>
+  </dialog>
 }
 
 export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear }) {
@@ -165,7 +197,7 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear })
     {!consulta.cargando && !consulta.error && obligaciones.length === 0 && <p className="empty-state" role="status">No hay obligaciones del mes ni deudas vencidas pendientes.</p>}
     {obligaciones.length > 0 && <div className="inicio-tabla-contenedor" role="region" aria-label="Obligaciones del mes y vencidas" tabIndex={0}>
       <table className="inicio-tabla" role="table">
-        <caption>{obligaciones.length} obligación(es). Selecciona una fila o pulsa Ver detalles.</caption>
+        <caption>{obligaciones.length} obligación(es). Pulsa Ver detalles para consultar los datos y abonos del pago.</caption>
         <thead role="rowgroup"><tr role="row">{['Concepto', 'Beneficiario', 'Monto original', 'Saldo pendiente', 'Vencimiento', 'Estado del pago', 'Acciones'].map((texto) => <th role="columnheader" key={texto} scope="col">{texto}</th>)}</tr></thead>
         <tbody role="rowgroup">{obligaciones.map((obligacion) => <tr role="row" key={obligacion.id} className={seleccionado === obligacion.id ? 'inicio-fila--seleccionada' : ''}
           onClick={(evento) => seleccionar(obligacion, evento.currentTarget.querySelector('button'))}>
@@ -177,11 +209,9 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear })
           <td role="cell" data-etiqueta="Estado del pago"><EstadoPago obligacion={obligacion} /></td>
           <td role="cell" data-etiqueta="Acciones"><div className="inicio-acciones-fila">
             <button type="button" className="secondary-button" disabled={bloqueada} aria-label={`Ver detalles de ${obligacion.concepto} (#${obligacion.id})`}
+              aria-haspopup="dialog"
               aria-expanded={seleccionado === obligacion.id} aria-controls={seleccionado === obligacion.id ? 'detalle-obligacion-inicio' : undefined}
               onClick={(evento) => { evento.stopPropagation(); seleccionar(obligacion, evento.currentTarget) }}>Ver detalles</button>
-            {puedeRegistrar && convertirACentimos(obligacion.saldo_pendiente) > 0n && <button type="button" disabled={bloqueada}
-              aria-label={`Registrar pago de ${obligacion.concepto} (#${obligacion.id})`}
-              onClick={(evento) => { evento.stopPropagation(); seleccionar(obligacion, evento.currentTarget) }}>Registrar pago</button>}
           </div></td>
         </tr>)}</tbody>
       </table>

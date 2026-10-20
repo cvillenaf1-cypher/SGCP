@@ -286,7 +286,7 @@ export function DatosObligacionAbono({ identificador, alBloquear, alActualizarOb
           <input id="monto-abono" name="montoAbono" type="text" inputMode="decimal" required disabled={guardando || Boolean(operacionPendiente)}
             value={valores.montoAbono} onChange={(evento) => { establecerValores({ ...valores, montoAbono: evento.target.value }); establecerAviso(''); establecerMensajeError('') }}
             aria-invalid={Boolean(errores.montoAbono)} aria-describedby={`ayuda-monto-abono${errores.montoAbono ? ' error-monto-abono' : ''}`} />
-          <small id="ayuda-monto-abono" className="description">Mayor que cero, hasta dos decimales y sin superar el saldo disponible.</small>
+          <small id="ayuda-monto-abono" className="description">Mayor que cero, hasta dos decimales. Máximo a abonar: {formatearImporte(obligacion.saldo_pendiente)}.</small>
           {errores.montoAbono && <p className="field-error" id="error-monto-abono">{errores.montoAbono}</p>}
         </div>
         <div className="field">
