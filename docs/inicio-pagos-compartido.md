@@ -1,0 +1,87 @@
+# Inicio compartido: pagos del mes y registro directo
+
+El gerente y el asistente ven automáticamente los compromisos del mes actual y
+las obligaciones anteriores con saldo pendiente. La pantalla usa el calendario
+de `America/Lima` y la fecha de vencimiento, sin filtros superiores.
+
+## Comportamiento
+
+- Incluye todas las obligaciones del mes, incluso las pagadas.
+- Incluye vencidas de meses anteriores mientras tengan saldo.
+- Excluye futuras y antiguas pagadas del inicio; el historial conserva los datos.
+- Ordena vencidas, pendientes/parciales del mes y pagadas; desempata por fecha e ID.
+- Muestra concepto, beneficiario, importe original, saldo, vencimiento y estado.
+- Conserva el estado económico y muestra el vencimiento como condición adicional.
+- Actualiza el período al cambiar el día en Lima, también al recuperar el foco.
+
+Una fila o su botón **Ver detalles** abre un panel dentro de la misma pantalla.
+El panel recibe el foco y permite cerrar con su botón o Escape; devuelve el foco
+al botón de origen o a **Actualizar listado** si la fila ya no está visible.
+
+## Pagos y comprobantes
+
+El asistente puede pulsar **Registrar pago** y usar directamente el formulario
+existente: monto, medio de pago y comprobante opcional. No vuelve a seleccionar
+la obligación. Se conserva el endpoint monetario, la validación de céntimos,
+la transacción del backend y la clave de idempotencia durante un reintento.
+
+Después del abono se actualizan el saldo, el estado, el listado y el historial.
+El panel permanece abierto cuando una deuda antigua se cancela y sale del listado.
+El registro monetario y el archivo mantienen confirmaciones independientes:
+un error de comprobante no deshace ni repite el abono.
+
+Mientras hay un envío o una confirmación incierta se bloquean el cierre del panel,
+el cambio de módulo y el cierre de sesión; la recarga avisa mediante `beforeunload`.
+Al quedar confirmado el resultado se puede cerrar el panel.
+
+El historial del detalle reutiliza la consulta y visualización autenticada de
+comprobantes. Un asistente sigue viendo archivos de sus propios abonos; el gerente
+puede consultar los comprobantes conforme al permiso de lectura ya existente.
+
+## Permisos y alcance
+
+Se habilitan para GERENTE únicamente las lecturas de detalle e historial existentes.
+El listado general mantiene sus filtros y resultados completos. Los POST de
+obligaciones, abonos y comprobantes siguen siendo exclusivos del ASISTENTE.
+
+Se conserva la consulta mensual histórica del gerente con su selector de período,
+además de las funciones secundarias del asistente y su historial general.
+
+No se añaden aprobaciones empresariales ni verificaciones bancarias. Un comprobante
+es evidencia adjunta al registro, no una confirmación bancaria de autenticidad.
+No hay migraciones nuevas, dependencias nuevas ni cambios de infraestructura.
+
+## Comprobación local
+
+En `frontend/`:
+
+```powershell
+npm.cmd run lint
+npm.cmd test -- --maxWorkers=2
+npm.cmd run build
+$env:PLAYWRIGHT_CHANNEL = 'msedge'
+npx.cmd playwright test --config=playwright.inicio.config.js
+```
+
+La configuración `playwright.inicio.config.js` prueba inicio e historial en un
+navegador con respuestas HTTP simuladas, sin acceder a MySQL. Incluye capturas
+de escritorio y móvil en `frontend/.local/`, excluidas de Git.
+
+En `backend/`, ejecutar `npm.cmd run check`, `npm.cmd run lint` y `npm.cmd test`.
+Las integraciones con MySQL y la configuración E2E habitual requieren
+`backend/.env.test` y una base independiente con sufijo `_test`.
+
+## Resultados del 20/10/2026
+
+- Frontend: 174 pruebas aprobadas; build aprobado.
+- Lint del frontend: finaliza correctamente con la advertencia preexistente de
+  `MascotaSapo` sin utilizar en `LoginPage.jsx`.
+- Backend: comprobación de sintaxis y lint aprobados; 78 pruebas unitarias y de
+  rutas sin MySQL aprobadas, incluidos los permisos de lectura del gerente.
+- Navegador Edge: 10 pruebas de inicio e historial aprobadas con API simulada;
+  cubren teclado, móvil, ambos roles, abonos y reintentos de comprobante.
+- `npm.cmd test` completo del backend se ejecutó, pero las suites que requieren
+  MySQL fallan al preparar su entorno: `Configura backend/.env.test para ejecutar
+  pruebas con MySQL real.` Su validación y el E2E con base real quedan pendientes.
+- Se revisaron visualmente las capturas de escritorio y móvil. Los datos mostrados
+  en ellas son exclusivamente ejemplos de las pruebas.

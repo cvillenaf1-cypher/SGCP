@@ -41,7 +41,7 @@ function comprobarIndicador(titulo, importe) {
 }
 
 async function completarConsulta() {
-  await act(async () => {})
+  await act(async () => { })
 }
 
 describe('HU-07: cálculos mensuales exactos', () => {
@@ -83,10 +83,12 @@ describe('HU-07: cálculos mensuales exactos', () => {
       { monto: 3030n, fechaRegistro: '2026-11-01' },
     ]
     const saldo = 10000n - abonos.reduce((total, abono) => total + abono.monto, 0n)
-    const solicitar = vi.fn().mockResolvedValue({ obligaciones: [{
-      monto_original: '100.00', saldo_pendiente: `${saldo / 100n}.${saldo % 100n}`,
-      fecha_limite: '2026-10-15', fecha_registro: '2026-08-01', estado_economico: 'PARCIAL',
-    }] })
+    const solicitar = vi.fn().mockResolvedValue({
+      obligaciones: [{
+        monto_original: '100.00', saldo_pendiente: `${saldo / 100n}.${saldo % 100n}`,
+        fecha_limite: '2026-10-15', fecha_registro: '2026-08-01', estado_economico: 'PARCIAL',
+      }]
+    })
     const obligaciones = await consultarPagosDelMes({ solicitar })
     expect(calcularResumenMensual(obligaciones, 10, 2026).abonado).toBe(6060n)
     expect(solicitar).toHaveBeenCalledExactlyOnceWith('/api/obligaciones', { signal: undefined })
@@ -273,9 +275,22 @@ describe('HU-07: restricciones de acceso con el login existente', () => {
     await usuario.click(screen.getByRole('link', { name: /Visualizar resumen mensual/ }))
     await screen.findByText('No hay obligaciones con vencimiento en este período.')
     expect(screen.getAllByText('S/ 0.00')).toHaveLength(4)
-    const llamadas = fetch.mock.calls.filter(([url]) => url.endsWith('/api/obligaciones'))
-    expect(llamadas).toHaveLength(1)
-    expect(llamadas[0][1]).toEqual(expect.objectContaining({ method: 'GET', headers: expect.objectContaining({ Authorization: 'Bearer token-ficticio-hu07' }) }))
+    const llamadas = fetch.mock.calls.filter(([url]) =>
+      url.endsWith('/api/obligaciones')
+    )
+
+    expect(llamadas.length).toBeGreaterThanOrEqual(1)
+
+    for (const [, opciones] of llamadas) {
+      expect(opciones).toEqual(
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer token-ficticio-hu07',
+          }),
+        })
+      )
+    }
   })
 
   it('vuelve al login cuando el servidor responde 401', async () => {

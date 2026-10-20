@@ -209,14 +209,22 @@ test('HU-06: GERENTE consulta el listado real incluidos pagos parciales y comple
   comprobarSoloLecturas(ejecutar, obtenerConexion)
 })
 
-test('HU-06: GERENTE recibe 422 con filtros inválidos y conserva el bloqueo del detalle y las escrituras', async () => {
+test('GERENTE valida consultas y conserva el bloqueo de todas las escrituras', async () => {
   const { aplicacion, ejecutar, obtenerConexion } = await prepararAplicacion({ rol: 'GERENTE' })
   await request(aplicacion).get('/api/obligaciones?filtro=invalido').auth(token, { type: 'bearer' }).expect(422)
-  await request(aplicacion).get('/api/obligaciones/no-valido').auth(token, { type: 'bearer' }).set('X-Role', 'ASISTENTE').expect(403)
+  await request(aplicacion).get('/api/obligaciones/no-valido').auth(token, { type: 'bearer' }).set('X-Role', 'ASISTENTE').expect(422)
   await request(aplicacion).post('/api/obligaciones').auth(token, { type: 'bearer' }).send({}).expect(403)
   await request(aplicacion).post('/api/obligaciones/81/abonos').auth(token, { type: 'bearer' }).send({}).expect(403)
   assert.equal(ejecutar.mock.callCount(), 4)
   assert.equal(lecturasObligaciones(ejecutar).length, 0)
+  comprobarSoloLecturas(ejecutar, obtenerConexion)
+})
+
+test('GERENTE consulta el detalle real sin abrir transacciones ni alterar saldos', async () => {
+  const { aplicacion, ejecutar, obtenerConexion } = await prepararAplicacion({ rol: 'GERENTE' })
+  const respuesta = await request(aplicacion).get('/api/obligaciones/81').auth(token, { type: 'bearer' }).expect(200)
+  assert.equal(respuesta.body.obligacion.id, 81)
+  assert.equal(respuesta.body.obligacion.saldo_pendiente, '120.50')
   comprobarSoloLecturas(ejecutar, obtenerConexion)
 })
 

@@ -15,12 +15,14 @@ function Aplicacion() {
 
   const ubicacion = useLocation()
   const esPaginaInicioSesion = ubicacion.pathname === '/login'
-  const esModuloGerente = usuario?.role === 'GERENTE' && ubicacion.pathname.startsWith('/gerente')
+  const esModuloTrabajo = Boolean(usuario) && /^\/(gerente|asistente)(\/|$)/.test(ubicacion.pathname)
 
   const [cerrando, establecerCerrando] = useState(false)
   const [error, establecerError] = useState('')
+  const [operacionBloqueada, establecerOperacionBloqueada] = useState(false)
 
   async function salir() {
+    if (operacionBloqueada) return
     establecerCerrando(true)
     establecerError('')
 
@@ -37,21 +39,22 @@ function Aplicacion() {
 
   return (
     <div
-      className={`app-shell ${esPaginaInicioSesion ? 'app-shell--login' : esModuloGerente ? 'app-shell--gerente' : ''
-        }`}
+      className={`app-shell ${
+        esPaginaInicioSesion ? 'app-shell--login' : esModuloTrabajo ? 'app-shell--gerente' : ''
+      }`}
     >
 
       {/* Encabezado: visible solamente fuera del login */}
       {!esPaginaInicioSesion && (
         <header className="app-header">
-          <span className="brand">{esModuloGerente ? <>S<span>A</span>PO</> : 'SGCP'}</span>
+          <span className="brand">{esModuloTrabajo ? <>S<span>A</span>PO</> : 'SGCP'}</span>
 
           <h1>
-            {esModuloGerente ? 'Sistema de Administración de Pagos y Obligaciones' : 'Sistema de Gestión y Control de Pagos (SGCP)'}
+            {esModuloTrabajo ? 'Sistema de Administración de Pagos y Obligaciones' : 'Sistema de Gestión y Control de Pagos (SGCP)'}
           </h1>
 
           <p className="description">
-            {esModuloGerente ? 'Espacio del gerente' : 'Organización y seguimiento de los compromisos económicos del negocio.'}
+            {esModuloTrabajo ? 'Tus pagos y obligaciones bajo control' : 'Organización y seguimiento de los compromisos económicos del negocio.'}
           </p>
 
           {usuario && (
@@ -70,7 +73,7 @@ function Aplicacion() {
                 className="secondary-button"
                 type="button"
                 onClick={salir}
-                disabled={cerrando}
+                disabled={cerrando || operacionBloqueada}
               >
                 {cerrando ? 'Cerrando…' : 'Cerrar sesión'}
               </button>
@@ -114,7 +117,7 @@ function Aplicacion() {
           <Route element={<RequerirRol role="ASISTENTE" />}>
             <Route
               path="/asistente"
-              element={<PaginaPanel role="ASISTENTE" />}
+              element={<PaginaPanel role="ASISTENTE" alBloquear={establecerOperacionBloqueada} />}
             />
           </Route>
 
@@ -152,7 +155,7 @@ function Aplicacion() {
       {/* Pie de página: oculto durante el login */}
       {!esPaginaInicioSesion && (
         <footer className="app-footer">
-          Moneda: soles (S/). {esModuloGerente ? 'SAPO' : 'SGCP'} registra operaciones
+          Moneda: soles (S/). {esModuloTrabajo ? 'SAPO' : 'SGCP'} registra operaciones
           externas; no realiza transferencias ni cobros.
         </footer>
       )}

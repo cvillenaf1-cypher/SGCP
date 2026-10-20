@@ -3,9 +3,10 @@ import { useAutenticacion } from '../auth/useAuth'
 import { convertirACentimos, mediosPago, validarAbono } from '../lib/validarAbono'
 import { formatearImporte } from '../lib/formatearImporte'
 import { SelectorComprobante } from './SelectorComprobante'
+import { actualizarEstadoObligacion } from '../lib/pagosInicio'
 import './FormularioAbono.css'
 
-function DatosObligacionAbono({ identificador, alBloquear, alActualizarObligacion }) {
+export function DatosObligacionAbono({ identificador, alBloquear, alActualizarObligacion, alRegistrar, mostrarResumen = true }) {
   const { solicitar } = useAutenticacion()
   const [consulta, establecerConsulta] = useState({ cargando: true, obligacion: null, error: '' })
   const [intento, establecerIntento] = useState(0)
@@ -27,9 +28,16 @@ function DatosObligacionAbono({ identificador, alBloquear, alActualizarObligacio
   const operacionPendienteRef = useRef(null)
 
   useEffect(() => {
-    alBloquear(guardando || Boolean(operacionPendiente) || Boolean(registroComprobante))
+    alBloquear(guardando || Boolean(operacionPendiente) || procesandoComprobante || Boolean(registroComprobante?.incierto))
     return () => alBloquear(false)
-  }, [alBloquear, guardando, operacionPendiente, registroComprobante])
+  }, [alBloquear, guardando, operacionPendiente, procesandoComprobante, registroComprobante])
+
+  useEffect(() => {
+    if (!guardando && !operacionPendiente && !procesandoComprobante && !registroComprobante?.incierto) return
+    const protegerSalida = (evento) => { evento.preventDefault(); evento.returnValue = '' }
+    window.addEventListener('beforeunload', protegerSalida)
+    return () => window.removeEventListener('beforeunload', protegerSalida)
+  }, [guardando, operacionPendiente, procesandoComprobante, registroComprobante])
 
   useEffect(() => {
     const controlador = new AbortController()
@@ -106,7 +114,9 @@ function DatosObligacionAbono({ identificador, alBloquear, alActualizarObligacio
       establecerOperacionPendiente(null)
       establecerErrores({})
       establecerAviso(resultado.message || 'Abono registrado correctamente.')
-      alActualizarObligacion({ ...consulta.obligacion, saldo_pendiente: resultado.abono.saldo_resultante })
+      alActualizarObligacion(actualizarEstadoObligacion({ ...consulta.obligacion, saldo_pendiente: resultado.abono.saldo_resultante }))
+      alRegistrar?.()
+      establecerValores({ montoAbono: '', medioPago: '' })
       actualizarSaldo()
       if (comprobante) {
         const registro = { abonoId: resultado.abono.id, archivo: comprobante, metadatos: null, incierto: false }
@@ -153,6 +163,7 @@ function DatosObligacionAbono({ identificador, alBloquear, alActualizarObligacio
       if (resultado?.comprobante?.abono_id !== registro.abonoId) throw new Error('No se pudo confirmar la asociación del archivo.')
       establecerRegistroComprobante({ ...registro, metadatos: resultado.comprobante, incierto: false })
       establecerMensajeComprobante('Comprobante asociado correctamente.')
+      alRegistrar?.()
     } catch (error) {
       // El abono ya se confirmó: aquí nunca se llama al registro monetario.
       const incierto = !error.status || error.status >= 500
@@ -174,7 +185,9 @@ function DatosObligacionAbono({ identificador, alBloquear, alActualizarObligacio
       if (resultado.tiene_comprobante && resultado.comprobante?.abono_id === registroComprobante.abonoId) {
         establecerRegistroComprobante({ ...registroComprobante, metadatos: resultado.comprobante, incierto: false })
         establecerMensajeComprobante('El servidor confirma que el abono tiene comprobante.')
+        alRegistrar?.()
       } else {
+        establecerRegistroComprobante({ ...registroComprobante, incierto: false })
         establecerMensajeComprobante('El servidor todavía no confirma un comprobante asociado. Puedes reintentar el mismo archivo.')
       }
     } catch (error) {
@@ -256,14 +269,14 @@ function DatosObligacionAbono({ identificador, alBloquear, alActualizarObligacio
   const tieneSaldo = convertirACentimos(obligacion.saldo_pendiente) > 0n
   return <>
     {panelComprobante}
-    <dl className="abono-resumen">
+    {mostrarResumen && <dl className="abono-resumen">
       <div><dt>Concepto</dt><dd>{obligacion.concepto}</dd></div>
       <div><dt>Beneficiario</dt><dd>{obligacion.beneficiario}</dd></div>
       <div><dt>Monto original</dt><dd>{formatearImporte(obligacion.monto_original)}</dd></div>
       <div><dt>Saldo disponible</dt><dd>{formatearImporte(obligacion.saldo_pendiente)}</dd></div>
       <div><dt>Estado económico</dt><dd>{obligacion.estado_economico}</dd></div>
       {obligacion.vencida && <div><dt>Vencimiento</dt><dd>Vencida</dd></div>}
-    </dl>
+    </dl>}
     {aviso && <p className="notice" role="status">{aviso}</p>}
     {mensajeError && <p className="error-message" role="alert">{mensajeError}</p>}
     {!tieneSaldo ? <p className="notice" role="alert">Esta obligación ya está pagada. Selecciona otra obligación con saldo disponible.</p> : !registroComprobante && <form ref={formulario} noValidate onSubmit={comprobarAbono}>
@@ -296,12 +309,13 @@ function DatosObligacionAbono({ identificador, alBloquear, alActualizarObligacio
   </>
 }
 
-export function FormularioAbono() {
+export function FormularioAbono({ alBloquear } = {}) {
   const { solicitar } = useAutenticacion()
   const [consulta, establecerConsulta] = useState({ cargando: true, obligaciones: [], error: '' })
   const [seleccionado, establecerSeleccionado] = useState('')
   const [operacionBloqueada, establecerOperacionBloqueada] = useState(false)
   const [intento, establecerIntento] = useState(0)
+  const bloquear = useCallback((valor) => { establecerOperacionBloqueada(valor); alBloquear?.(valor) }, [alBloquear])
   const actualizarObligacion = useCallback((obligacionActualizada) => {
     establecerConsulta((actual) => ({
       ...actual,
@@ -346,7 +360,7 @@ export function FormularioAbono() {
         <button type="button" className="secondary-button" disabled={operacionBloqueada} onClick={actualizarObligaciones}>Actualizar obligaciones</button>
       </div>
       {disponibles.length === 0 && <p className="empty-state" role="status">{consulta.obligaciones.length ? 'Todas las obligaciones están pagadas. No hay saldos disponibles para abonar.' : 'Todavía no hay obligaciones registradas. Registra primero un pago pendiente.'}</p>}
-      {seleccionado && <DatosObligacionAbono key={seleccionado} identificador={seleccionado} alBloquear={establecerOperacionBloqueada} alActualizarObligacion={actualizarObligacion} />}
+      {seleccionado && <DatosObligacionAbono key={seleccionado} identificador={seleccionado} alBloquear={bloquear} alActualizarObligacion={actualizarObligacion} />}
     </>}
   </section>
 }

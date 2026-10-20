@@ -13,7 +13,7 @@ const CONSULTA_HISTORIAL = `SELECT
   WHERE o.id = ?
   ORDER BY a.fecha_registro DESC, a.id DESC`
 
-export async function consultarHistorial(conexiones, obligacionId, usuarioId) {
+export async function consultarHistorial(conexiones, obligacionId, usuarioId, rol) {
   const [filas] = await conexiones.execute(CONSULTA_HISTORIAL, [obligacionId])
   if (!filas.length) return null
   const obligacion = filas[0]
@@ -21,7 +21,7 @@ export async function consultarHistorial(conexiones, obligacionId, usuarioId) {
   const abonos = filas.filter((fila) => fila.abono_id !== null).map((fila) => {
     totalCentavos += aCentavos(fila.monto)
     const tieneComprobante = fila.comprobante_abono_id !== null
-    const puedeDescargar = tieneComprobante && fila.usuario_registrador_id === usuarioId
+    const puedeDescargar = tieneComprobante && (rol === 'GERENTE' || fila.usuario_registrador_id === usuarioId)
     return {
       id: fila.abono_id,
       monto: fila.monto,

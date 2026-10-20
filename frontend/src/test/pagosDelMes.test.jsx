@@ -321,9 +321,7 @@ describe('Protección de la ruta mensual con la autenticación existente', () =>
   })
 
   it('un 401 de la consulta mensual devuelve al gerente al login existente', async () => {
-    const usuario = await iniciarSesion('GERENTE', 401)
-    await screen.findByRole('heading', { name: 'Panel de gerente' })
-    await usuario.click(screen.getByRole('link', { name: 'Consultar pagos del mes' }))
+    await iniciarSesion('GERENTE', 401)
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Tu sesión venció')
   })

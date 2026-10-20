@@ -118,7 +118,7 @@ export function PresentacionHistorial({ historial }) {
   </>
 }
 
-function ConsultaHistorialObligacion({ identificador }) {
+export function ConsultaHistorialObligacion({ identificador, actualizacion = 0 }) {
   const { solicitar } = useAutenticacion()
   const [estado, establecerEstado] = useState({ cargando: true, historial: null, error: '' })
   const [intento, establecerIntento] = useState(0)
@@ -133,7 +133,7 @@ function ConsultaHistorialObligacion({ identificador }) {
         if (!controlador.signal.aborted) establecerEstado((actual) => ({ ...actual, cargando: false, error: fallo.message }))
       })
     return () => controlador.abort()
-  }, [identificador, intento, solicitar])
+  }, [identificador, intento, actualizacion, solicitar])
 
   function actualizarHistorial() {
     establecerEstado((actual) => ({ ...actual, cargando: true, error: '' }))

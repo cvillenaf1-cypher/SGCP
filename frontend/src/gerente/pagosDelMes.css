@@ -1,4 +1,4 @@
-/* El marco SAPO se activa únicamente en las rutas autorizadas del gerente. */
+/* Marco SAPO compartido por las rutas autorizadas del gerente y del asistente. */
 #root:has(.app-shell--gerente) {
   display: block;
   padding: 0;

@@ -8,6 +8,18 @@ import { ProveedorAutenticacion } from '../auth/AuthProvider'
 const respuesta = (cuerpo, estado = 200) => ({ ok: estado >= 200 && estado < 300, status: estado, json: async () => cuerpo })
 const sesionPrueba = (rol = 'ASISTENTE') => ({ token: 'token-de-prueba-no-real', expiresAt: new Date(Date.now() + 60000).toISOString(), user: { id: 1, name: 'Usuario de prueba', email: 'prueba@example.test', role: rol } })
 
+function simularSesion(rol = 'ASISTENTE', responder = () => undefined) {
+  fetch.mockImplementation(async (url, opciones) => {
+    if (url.endsWith('/api/auth/login')) return respuesta(sesionPrueba(rol))
+    const personalizada = responder(url, opciones)
+    if (personalizada !== undefined) return personalizada
+    if (url.includes('/api/panel/')) return respuesta({ message: 'Acceso habilitado.' })
+    if (url.endsWith('/api/obligaciones')) return respuesta({ obligaciones: [] })
+    if (url.endsWith('/api/auth/logout')) return respuesta(null, 204)
+    throw new Error(`Ruta inesperada: ${url}`)
+  })
+}
+
 function renderizarAplicacion(ruta = '/login') {
   return render(<MemoryRouter initialEntries={[ruta]}><ProveedorAutenticacion><Aplicacion /><Link to="/gerente">Ir a gerente (prueba)</Link><Link to="/asistente">Ir a asistente (prueba)</Link></ProveedorAutenticacion></MemoryRouter>)
 }
@@ -48,11 +60,11 @@ describe('Acceso SGCP', () => {
 
   for (const [rol, titulo] of [['ASISTENTE', 'Panel de asistente'], ['GERENTE', 'Panel de gerente']]) {
     it(`entra al panel de ${rol}, envía Bearer y no persiste secretos en almacenamiento web`, async () => {
-      fetch.mockResolvedValueOnce(respuesta(sesionPrueba(rol))).mockResolvedValue(respuesta({ message: 'Acceso verificado por la API.' }))
+      simularSesion(rol)
       renderizarAplicacion()
       await completarInicioSesion()
       expect(await screen.findByRole('heading', { name: titulo })).toBeInTheDocument()
-      await screen.findByText('Acceso verificado por la API.')
+      await screen.findByText('No hay obligaciones del mes ni deudas vencidas pendientes.')
       expect(fetch.mock.calls[1][1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
       expect(localStorage.length).toBe(0)
       expect(sessionStorage.length).toBe(0)
@@ -66,13 +78,14 @@ describe('Acceso SGCP', () => {
         expect(screen.getByRole('heading', { name: 'Acceso no permitido' })).toBeInTheDocument()
         expect(screen.queryByLabelText('Concepto del pago')).not.toBeInTheDocument()
       } else {
-        expect(screen.getByLabelText('Concepto del pago')).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Pagos del mes' })).toBeInTheDocument()
+        expect(screen.queryByLabelText('Concepto del pago')).not.toBeInTheDocument()
       }
     })
   }
 
   it('bloquea navegación al panel de otro rol sin consultar ese endpoint', async () => {
-    fetch.mockResolvedValueOnce(respuesta(sesionPrueba())).mockResolvedValue(respuesta({ message: 'Acceso habilitado.' }))
+    simularSesion()
     renderizarAplicacion()
     const usuario = await completarInicioSesion()
     await screen.findByRole('heading', { name: 'Panel de asistente' })
@@ -89,26 +102,20 @@ describe('Acceso SGCP', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Tu sesión venció')
   })
 
-  it('ASISTENTE navega a consulta con Bearer y un 401 de obligaciones devuelve al login', async () => {
-    fetch.mockResolvedValueOnce(respuesta(sesionPrueba()))
-      .mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' }))
-      .mockResolvedValue(respuesta({ message: 'Sesión vencida.' }, 401))
+  it('ASISTENTE consulta automáticamente con Bearer y un 401 de obligaciones devuelve al login', async () => {
+    simularSesion('ASISTENTE', (url) => url.endsWith('/api/obligaciones') ? respuesta({ message: 'Sesión vencida.' }, 401) : undefined)
     renderizarAplicacion()
-    const usuario = await completarInicioSesion()
-    await screen.findByText('Acceso habilitado.')
-    await usuario.click(screen.getByRole('button', { name: 'Consultar pagos pendientes' }))
+    await completarInicioSesion()
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
     const llamada = fetch.mock.calls.find(([url]) => url.endsWith('/api/obligaciones'))
     expect(llamada[1].headers.Authorization).toBe('Bearer token-de-prueba-no-real')
   })
 
   it('ASISTENTE abre HU-03 con sesión y consulta sus obligaciones con Bearer', async () => {
-    fetch.mockResolvedValueOnce(respuesta(sesionPrueba()))
-      .mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' }))
-      .mockResolvedValue(respuesta({ obligaciones: [] }))
+    simularSesion()
     renderizarAplicacion()
     const usuario = await completarInicioSesion()
-    await screen.findByText('Acceso habilitado.')
+    await screen.findByRole('heading', { name: 'Pagos del mes' })
     await usuario.click(screen.getByRole('button', { name: 'Registrar pagos realizados' }))
     expect(await screen.findByRole('heading', { name: 'Registrar pagos realizados' })).toBeInTheDocument()
     await screen.findByText('Todavía no hay obligaciones registradas. Registra primero un pago pendiente.')
@@ -118,12 +125,11 @@ describe('Acceso SGCP', () => {
   })
 
   it('ASISTENTE abre el historial y una sesión vencida al consultar vuelve al login', async () => {
-    fetch.mockResolvedValueOnce(respuesta(sesionPrueba()))
-      .mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' }))
-      .mockResolvedValue(respuesta({ message: 'Sesión vencida.' }, 401))
+    let consultas = 0
+    simularSesion('ASISTENTE', (url) => url.endsWith('/api/obligaciones') && ++consultas > 1 ? respuesta({ message: 'Sesión vencida.' }, 401) : undefined)
     renderizarAplicacion()
     const usuario = await completarInicioSesion()
-    await screen.findByText('Acceso habilitado.')
+    await screen.findByText('No hay obligaciones del mes ni deudas vencidas pendientes.')
     await usuario.click(screen.getByRole('button', { name: 'Consultar historial de pagos' }))
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
     const llamada = fetch.mock.calls.find(([url]) => url.endsWith('/api/obligaciones'))
@@ -131,18 +137,16 @@ describe('Acceso SGCP', () => {
   })
 
   it('consulta el historial real con Bearer y únicamente realiza lecturas después del login', async () => {
-    const obligacion = { id: 81, concepto: 'Servicio de limpieza', monto_original: '100.00', saldo_pendiente: '0.00', estado_economico: 'PAGADO' }
-    fetch.mockResolvedValueOnce(respuesta(sesionPrueba()))
-      .mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' }))
-      .mockResolvedValueOnce(respuesta({ obligaciones: [obligacion] }))
-      .mockResolvedValue(respuesta({ historial: {
+    const obligacion = { id: 81, concepto: 'Servicio de limpieza', beneficiario: 'Proveedor', fecha_limite: '2026-10-01', monto_original: '100.00', saldo_pendiente: '0.00', estado_economico: 'PAGADO' }
+    simularSesion('ASISTENTE', (url) => url.endsWith('/api/obligaciones') ? respuesta({ obligaciones: [obligacion] })
+      : url.endsWith('/historial') ? respuesta({ historial: {
         obligacion_id: 81, concepto: obligacion.concepto, monto_original: '100.00', total_abonado: '100.00', saldo_pendiente: '0.00',
         estado_economico: 'PAGADO', resumen_consistente: true, advertencia: null,
         abonos: [{ id: 8, monto: '100.00', medio_pago: 'Efectivo', fecha_registro: '2026-10-18T16:00:00.000Z', tiene_comprobante: false, puede_descargar_comprobante: false, url_comprobante: null }],
-      } }))
+      } }) : undefined)
     renderizarAplicacion()
     const usuario = await completarInicioSesion()
-    await screen.findByText('Acceso habilitado.')
+    await screen.findByRole('heading', { name: 'Pagos del mes' })
     await usuario.click(screen.getByRole('button', { name: 'Consultar historial de pagos' }))
     await usuario.click(await screen.findByRole('button', { name: 'Ver historial de Servicio de limpieza (#81)' }))
     expect(await screen.findByRole('list', { name: 'Historial de abonos' })).toHaveTextContent('Efectivo')
@@ -152,13 +156,12 @@ describe('Acceso SGCP', () => {
   })
 
   it('vuelve al login cuando vence la sesión al consultar los abonos de una obligación', async () => {
-    fetch.mockResolvedValueOnce(respuesta(sesionPrueba()))
-      .mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' }))
-      .mockResolvedValueOnce(respuesta({ obligaciones: [{ id: 81, concepto: 'Limpieza', beneficiario: 'Servicios Pérez', monto_original: '100.00', saldo_pendiente: '50.00', estado_economico: 'PARCIAL' }] }))
-      .mockResolvedValue(respuesta({ message: 'Sesión vencida.' }, 401))
+    simularSesion('ASISTENTE', (url) => url.endsWith('/api/obligaciones')
+      ? respuesta({ obligaciones: [{ id: 81, concepto: 'Limpieza', beneficiario: 'Servicios Pérez', fecha_limite: '2026-10-01', monto_original: '100.00', saldo_pendiente: '50.00', estado_economico: 'PARCIAL' }] })
+      : url.endsWith('/historial') ? respuesta({ message: 'Sesión vencida.' }, 401) : undefined)
     renderizarAplicacion()
     const usuario = await completarInicioSesion()
-    await screen.findByText('Acceso habilitado.')
+    await screen.findByRole('heading', { name: 'Pagos del mes' })
     await usuario.click(screen.getByRole('button', { name: 'Consultar historial de pagos' }))
     await usuario.click(await screen.findByRole('button', { name: 'Ver historial de Limpieza (#81)' }))
     expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
@@ -167,7 +170,7 @@ describe('Acceso SGCP', () => {
   })
 
   it('cierra sesión en el servidor y vuelve al login', async () => {
-    fetch.mockResolvedValueOnce(respuesta(sesionPrueba())).mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' })).mockResolvedValue(respuesta(null, 204))
+    simularSesion()
     renderizarAplicacion()
     const usuario = await completarInicioSesion()
     await screen.findByRole('heading', { name: 'Panel de asistente' })
@@ -178,10 +181,10 @@ describe('Acceso SGCP', () => {
   })
 
   it('un fallo de red al cerrar sesión informa el error y permite reintentar', async () => {
-    fetch.mockResolvedValueOnce(respuesta(sesionPrueba())).mockResolvedValueOnce(respuesta({ message: 'Acceso habilitado.' })).mockRejectedValue(new TypeError('Network error'))
+    simularSesion('ASISTENTE', (url) => { if (url.endsWith('/logout')) throw new TypeError('Network error') })
     renderizarAplicacion()
     const usuario = await completarInicioSesion()
-    await screen.findByText('Acceso habilitado.')
+    await screen.findByText('No hay obligaciones del mes ni deudas vencidas pendientes.')
     await usuario.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cerrar la sesión en el servidor')
     expect(screen.getByRole('heading', { name: 'Panel de asistente' })).toBeInTheDocument()
@@ -196,7 +199,7 @@ describe('Acceso SGCP', () => {
   })
 
   it('al montar la aplicación nuevamente no recupera la sesión anterior', async () => {
-    fetch.mockResolvedValueOnce(respuesta(sesionPrueba())).mockResolvedValue(respuesta({ message: 'Acceso habilitado.' }))
+    simularSesion()
     const primera = renderizarAplicacion()
     await completarInicioSesion()
     await screen.findByRole('heading', { name: 'Panel de asistente' })

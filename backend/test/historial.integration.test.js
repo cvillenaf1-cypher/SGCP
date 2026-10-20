@@ -57,9 +57,9 @@ async function consultar(id, indiceUsuario = 0) {
   return respuesta.body.historial
 }
 
-test('historial: exige autenticación y ASISTENTE antes de validar el identificador', async () => {
+test('historial: exige autenticación y valida identificadores para ambos roles de consulta', async () => {
   await request(aplicacion).get('/api/obligaciones/1/historial').expect(401)
-  await request(aplicacion).get('/api/obligaciones/invalido/historial').auth(tokens[2], { type: 'bearer' }).expect(403)
+  await request(aplicacion).get('/api/obligaciones/invalido/historial').auth(tokens[2], { type: 'bearer' }).expect(422)
   for (const id of ['0', '01', '-1', '1e2', '4294967296', 'invalido', '1%20OR%201']) {
     await request(aplicacion).get(`/api/obligaciones/${id}/historial`).auth(tokens[0], { type: 'bearer' }).expect(422)
   }
@@ -133,6 +133,10 @@ test('historial: comprobantes no duplican abonos y respetan los permisos de HU-0
   assert.equal(propio.abonos.find((abono) => abono.id !== primero.abono.id).tiene_comprobante, false)
   await request(aplicacion).get(comprobantePropio.url_comprobante).auth(tokens[0], { type: 'bearer' }).expect(200)
   await request(aplicacion).get(comprobantePropio.url_comprobante).auth(tokens[1], { type: 'bearer' }).expect(403)
+  const gerente = await consultar(id, 2)
+  const comprobanteGerente = gerente.abonos.find((abono) => abono.id === primero.abono.id)
+  assert.equal(comprobanteGerente.puede_descargar_comprobante, true)
+  await request(aplicacion).get(comprobanteGerente.url_comprobante).auth(tokens[2], { type: 'bearer' }).expect(200)
   const texto = JSON.stringify(propio)
   for (const privado of ['identificador_archivo', 'huella', 'clave_idempotencia', '.local', 'token']) assert.ok(!texto.includes(privado))
 })
