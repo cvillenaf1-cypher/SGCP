@@ -17,16 +17,3 @@ export function filtrarPagosPorPeriodo(pagos, mes, anio) {
   const prefijo = `${String(anio).padStart(4, '0')}-${String(mes).padStart(2, '0')}-`
   return pagos.filter((pago) => pago.fechaLimite.startsWith(prefijo))
 }
-
-const formatoMonto = new Intl.NumberFormat('es-PE', {
-  minimumFractionDigits: 2, maximumFractionDigits: 2,
-})
-
-export function formatearSoles(monto) {
-  return `S/ ${formatoMonto.format(Number(monto))}`
-}
-
-export function formatearFechaLimite(fecha) {
-  const [anio, mes, dia] = fecha.split('-')
-  return `${dia}/${mes}/${anio}`
-}
