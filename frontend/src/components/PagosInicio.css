@@ -7,9 +7,9 @@
 .app-shell--gerente .inicio-compartido .secondary-button:hover:not(:disabled) { background: #dceaf2; }
 .inicio-compartido button { min-height: 48px; }
 .inicio-compartido .consulta-navegacion [aria-pressed='true'],
-.inicio-compartido .inicio-acciones-fila > button:not(.secondary-button) { color: #fff; background: #006b50; }
+.inicio-registro button:not(.secondary-button) { color: #fff; background: #006b50; }
 .inicio-compartido .consulta-navegacion [aria-pressed='true']:hover,
-.inicio-compartido .inicio-acciones-fila > button:not(.secondary-button):hover:not(:disabled) { background: #00503c; }
+.inicio-registro button:not(.secondary-button):hover:not(:disabled) { background: #00503c; }
 .pagos-inicio { min-width: 0; margin-top: 24px; }
 .inicio-encabezado { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
 .inicio-encabezado h3 { font-size: clamp(1.6rem, 3vw, 2rem); margin: 0; color: #041e38; }
@@ -32,8 +32,9 @@
 .inicio-estado--pagado { background: #e1f5e8; color: #155c32; }
 .inicio-estado--vencida { background: #ffebeb; color: #9b2020; }
 .inicio-acciones-fila { display: grid; gap: 10px; min-width: 150px; }
-.inicio-detalle { margin-top: 28px; padding: clamp(18px, 3vw, 32px); border: 2px solid #428b75; border-radius: 18px; background: #fff; overflow-wrap: anywhere; }
-.inicio-detalle-encabezado { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.inicio-detalle { width: min(960px, calc(100% - 32px)); max-height: calc(100dvh - 40px); margin: auto; padding: clamp(18px, 3vw, 32px); border: 1px solid #ccd9e3; border-radius: 18px; background: #fff; color: #1d2b40; box-shadow: 0 24px 80px #041e3840; overflow: auto; overscroll-behavior: contain; overflow-wrap: anywhere; }
+.inicio-detalle::backdrop { background: #041e3899; }
+.inicio-detalle-encabezado { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; padding: 8px 0; background: #fff; border-bottom: 1px solid #dce5ed; }
 .inicio-detalle-encabezado h3 { margin: 0; font-size: 1.35rem; }
 .inicio-detalle h3:focus, .inicio-tabla-contenedor:focus-visible { outline: 3px solid #0878ba; outline-offset: 4px; }
 .inicio-resumen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin: 0; }

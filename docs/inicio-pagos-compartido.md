@@ -14,16 +14,23 @@ de `America/Lima` y la fecha de vencimiento, sin filtros superiores.
 - Conserva el estado económico y muestra el vencimiento como condición adicional.
 - Actualiza el período al cambiar el día en Lima, también al recuperar el foco.
 
-Una fila o su botón **Ver detalles** abre un panel dentro de la misma pantalla.
-El panel recibe el foco y permite cerrar con su botón o Escape; devuelve el foco
+Cada fila tiene un único botón **Ver detalles**, que abre una ventana modal con
+los datos de la obligación, su saldo y el historial de abonos y comprobantes.
+La ventana recibe el foco, impide interactuar con el fondo y permite cerrar con
+su botón o Escape; devuelve el foco
 al botón de origen o a **Actualizar listado** si la fila ya no está visible.
 
 ## Pagos y comprobantes
 
-El asistente puede pulsar **Registrar pago** y usar directamente el formulario
+Dentro del detalle, el asistente puede pulsar **Registrar pago** si queda saldo
+pendiente y usar directamente el formulario
 existente: monto, medio de pago y comprobante opcional. No vuelve a seleccionar
 la obligación. Se conserva el endpoint monetario, la validación de céntimos,
 la transacción del backend y la clave de idempotencia durante un reintento.
+El formulario indica el saldo máximo a abonar y rechaza un importe superior,
+incluido un exceso de un céntimo. El backend vuelve a verificar el saldo bajo
+bloqueo de fila para impedir excesos cuando hay registros simultáneos.
+Una obligación ya pagada permite consultar su historial, sin ofrecer otro pago.
 
 Después del abono se actualizan el saldo, el estado, el listado y el historial.
 El panel permanece abierto cuando una deuda antigua se cancela y sale del listado.
