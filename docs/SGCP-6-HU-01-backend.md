@@ -51,6 +51,12 @@ Ejemplo de respuesta HTTP `201` (identificador, creador y fecha ilustrativos):
 - `fecha_limite` exige una fecha calendario real en formato exacto `YYYY-MM-DD`,
   entre `1000-01-01` y `9999-12-31`, rango de MySQL DATE. Admite fechas anteriores
   a hoy. Se guarda sin conversión de zona horaria.
+- Si el asistente selecciona una fecha límite válida anterior al día actual en
+  `America/Lima`, el formulario muestra junto al campo: **La fecha seleccionada
+  ya pasó. Esta deuda se registrará como vencida.** El aviso es informativo y
+  permite guardar conservando el vencimiento original. Desaparece al seleccionar
+  hoy, una fecha futura o limpiar el campo. Las fechas inexistentes siguen
+  rechazándose; la fecha de registro continúa asignándose automáticamente.
 - Se rechaza todo campo adicional, incluidos creador, saldo, estado y fecha de
   registro. El creador procede exclusivamente de `solicitud.auth.user.id`.
 - Se reutiliza el pool MySQL existente con `getConnection` y consultas `execute`

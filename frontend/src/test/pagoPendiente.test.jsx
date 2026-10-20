@@ -1,10 +1,16 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ContextoAutenticacion } from '../auth/AuthContext'
 import { FormularioPagoPendiente } from '../components/FormularioPagoPendiente'
 import { validarFormulario } from '../lib/validarPagoPendiente'
 
 const valoresValidos = { concepto: 'Alquiler', beneficiario: 'Propietario', montoOriginal: '150.50', fechaLimite: '2020-02-29' }
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-20T16:00:00Z'))
+})
+afterEach(() => vi.useRealTimers())
 
 function prepararFormulario(solicitar = vi.fn()) {
   render(<ContextoAutenticacion.Provider value={{ solicitar }}><FormularioPagoPendiente /></ContextoAutenticacion.Provider>)
@@ -42,6 +48,37 @@ describe('Validaciones del pago pendiente', () => {
 })
 
 describe('Formulario de pago pendiente', () => {
+  it('avisa al seleccionar una fecha pasada y permite guardarla con su vencimiento original', async () => {
+    const solicitar = prepararFormulario(vi.fn().mockResolvedValue({ obligacion: { id: 89 } }))
+    const fecha = screen.getByLabelText('Fecha límite')
+    fireEvent.change(fecha, { target: { value: '2026-09-20' } })
+    expect(screen.getByRole('note')).toHaveTextContent('La fecha seleccionada ya pasó. Esta deuda se registrará como vencida.')
+    expect(fecha).toHaveAttribute('aria-invalid', 'false')
+    expect(fecha.getAttribute('aria-describedby')).toContain('aviso-fecha-pasada')
+    expect(screen.getByRole('button', { name: 'Registrar pago pendiente' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar pago pendiente' }))
+    await screen.findByText('Pago pendiente registrado correctamente.')
+    expect(solicitar.mock.calls[0][1].body.fecha_limite).toBe('2026-09-20')
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+  it('quita el aviso cuando se elige hoy, una fecha futura o se limpia el campo', () => {
+    prepararFormulario()
+    const fecha = screen.getByLabelText('Fecha límite')
+    expect(screen.getByRole('note')).toBeInTheDocument()
+    for (const valor of ['2026-10-20', '2026-10-21', '']) {
+      fireEvent.change(fecha, { target: { value: valor } })
+      expect(screen.queryByRole('note')).not.toBeInTheDocument()
+    }
+  })
+  it('utiliza el día de Lima aunque UTC ya esté en el día siguiente', () => {
+    vi.setSystemTime(new Date('2026-10-21T02:00:00Z'))
+    prepararFormulario()
+    const fecha = screen.getByLabelText('Fecha límite')
+    fireEvent.change(fecha, { target: { value: '2026-10-20' } })
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+    fireEvent.change(fecha, { target: { value: '2026-10-19' } })
+    expect(screen.getByRole('note')).toBeInTheDocument()
+  })
   it('impide enviar un importe mayor al máximo y permite corregirlo a S/ 100,000.00', async () => {
     const solicitar = prepararFormulario(vi.fn().mockResolvedValue({ obligacion: { id: 88 } }))
     fireEvent.change(screen.getByLabelText('Monto original (S/)'), { target: { value: '100000.01' } })
