@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAutenticacion } from '../auth/useAuth'
 import { formatearImporte } from '../lib/formatearImporte'
-import { convertirACentimos } from '../lib/validarAbono'
+import { convertirACentimos, obtenerMaximoAbono } from '../lib/validarAbono'
 import { actualizarEstadoObligacion, esObligacionValida, fechaActualLima, formatearFechaObligacion, seleccionarPagosInicio } from '../lib/pagosInicio'
 import { DatosObligacionAbono } from './FormularioAbono'
 import { ConsultaHistorialObligacion } from './HistorialPagos'
@@ -117,7 +117,7 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
     {obligacion && <>
       {puedeRegistrar && mostrarRegistro && <section className="inicio-registro" aria-labelledby="titulo-pago-directo">
         <h4 ref={tituloRegistro} tabIndex={-1} id="titulo-pago-directo">Registrar pago realizado</h4>
-        {convertirACentimos(obligacion.saldo_pendiente) > 0n && <p>Puedes abonar una parte o cancelar el saldo restante. El importe no puede superar {formatearImporte(obligacion.saldo_pendiente)}.</p>}
+        {convertirACentimos(obligacion.saldo_pendiente) > 0n && <p>Puedes abonar una parte o cancelar el saldo restante. El importe no puede superar {formatearImporte(obtenerMaximoAbono(obligacion.saldo_pendiente))}.</p>}
         <DatosObligacionAbono identificador={identificador} alBloquear={bloquear} alActualizarObligacion={actualizarObligacion}
           alRegistrar={actualizarTrasRegistro} mostrarResumen={false} />
       </section>}

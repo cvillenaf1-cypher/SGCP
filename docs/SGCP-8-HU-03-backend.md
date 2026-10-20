@@ -43,7 +43,7 @@ El identificador es un entero canónico entre `1` y `4294967295`.
 ```
 
 - `monto`: cadena decimal positiva en soles, hasta dos decimales y máximo
-  `99999999999.99`. Se normaliza y calcula con centavos enteros; nunca usar
+  `100000.00`, sin superar además el saldo pendiente. Se normaliza y calcula con centavos enteros; nunca usar
   números JSON para importes.
 - `medio_pago`: exactamente `Efectivo`, `Transferencia bancaria`, `Tarjeta` o
   `Billetera digital`.

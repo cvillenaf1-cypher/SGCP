@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ContextoAutenticacion } from '../auth/AuthContext'
 import { FormularioAbono } from '../components/FormularioAbono'
-import { convertirACentimos, mediosPago, validarAbono } from '../lib/validarAbono'
+import { convertirACentimos, mediosPago, obtenerMaximoAbono, validarAbono } from '../lib/validarAbono'
 
 const obligacion = { id: 81, concepto: 'Servicio', beneficiario: 'Proveedor', monto_original: '300.00', saldo_pendiente: '125.50', estado_economico: 'PARCIAL', vencida: true }
 const pendiente = { ...obligacion, id: 83, concepto: 'Préstamo pendiente', saldo_pendiente: '300.00', estado_economico: 'PENDIENTE' }
@@ -43,6 +43,15 @@ describe('Validación de abonos — HU-03', () => {
     expect(convertirACentimos('99999999999.99')).toBe(9999999999999n)
     expect(validarAbono({ ...valores, montoAbono: '99999999999.99' }, '99999999999.98').montoAbono).toBeTruthy()
   })
+  it('limita cada abono a S/ 100,000.00 aunque el saldo histórico sea mayor', () => {
+    expect(validarAbono({ ...valores, montoAbono: '100000.00' }, '200000.00')).toEqual({})
+    expect(obtenerMaximoAbono('200000.00')).toBe('100000.00')
+    expect(obtenerMaximoAbono('99.99')).toBe('99.99')
+    for (const montoAbono of ['100000.01', '100001', '00000100000.01', '99999999999.99']) {
+      expect(validarAbono({ ...valores, montoAbono }, '200000.00').montoAbono).toBe('El monto no puede superar S/ 100,000.00.')
+    }
+    expect(validarAbono({ ...valores, montoAbono: '100000.00' }, '99999.99').montoAbono).toBe('El abono no puede superar el saldo pendiente.')
+  })
   it('rechaza una obligación sin saldo y un medio no permitido', () => {
     expect(validarAbono(valores, '0.00').obligacion).toBeTruthy()
     expect(validarAbono({ ...valores, medioPago: 'Otro' }, '125.50').medioPago).toBeTruthy()
@@ -55,6 +64,17 @@ describe('Validación de abonos — HU-03', () => {
 })
 
 describe('Formulario de registro de pagos realizados', () => {
+  it('muestra el máximo permitido y bloquea el exceso en una obligación histórica mayor', async () => {
+    const anterior = { ...obligacion, monto_original: '200000.00', saldo_pendiente: '200000.00', estado_economico: 'PENDIENTE' }
+    const solicitar = prepararFormulario(vi.fn().mockResolvedValueOnce({ obligaciones: [anterior] }).mockResolvedValue({ obligacion: anterior }))
+    await seleccionarObligacion()
+    expect(screen.getByText(/Máximo a abonar:/)).toHaveTextContent('S/ 100,000.00')
+    fireEvent.change(screen.getByLabelText('Monto del abono (S/)'), { target: { value: '100000.01' } })
+    fireEvent.change(screen.getByLabelText('Medio de pago'), { target: { value: 'Efectivo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
+    expect(screen.getByText('El monto no puede superar S/ 100,000.00.')).toBeInTheDocument()
+    expect(solicitar.mock.calls.filter(([, opciones]) => opciones?.method === 'POST')).toHaveLength(0)
+  })
   it('consulta obligaciones reales y excluye las pagadas del selector', async () => {
     const solicitar = prepararFormulario()
     expect(screen.getByText('Cargando obligaciones…')).toBeInTheDocument()

@@ -28,7 +28,7 @@ almacenamiento persistente y respaldo junto con la base de datos.
 
 | Campo | Contenido |
 | --- | --- |
-| `monto` | Cadena decimal positiva, máximo dos decimales y hasta el saldo pendiente |
+| `monto` | Cadena decimal positiva, máximo dos decimales, hasta S/ 100,000.00 y sin superar el saldo pendiente |
 | `medio_pago` | Uno de los cuatro medios existentes |
 | `clave_idempotencia` | Clave aleatoria por operación, conservada al reintentar |
 | `comprobante` | Un archivo obligatorio JPG, PNG o PDF, máximo 5 MB |

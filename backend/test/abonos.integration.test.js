@@ -56,6 +56,32 @@ function nuevaClave() {
   return `abono_${randomUUID().replaceAll('-', '')}`
 }
 
+test('MySQL real: el registro de deudas acepta S/ 100,000.00 y rechaza un céntimo más sin insertar', async () => {
+  const concepto = `Límite de importe ${randomUUID()}`
+  const entrada = { concepto, beneficiario: 'Proveedor de prueba', monto: '100000.01', fecha_limite: '2027-01-01' }
+  const rechazada = await request(aplicacion).post('/api/obligaciones').auth(token, { type: 'bearer' }).send(entrada).expect(422)
+  assert.match(rechazada.body.fields.monto, /100,000.00/)
+  const [[{ cantidad }]] = await conexiones.execute('SELECT COUNT(*) AS cantidad FROM obligaciones WHERE concepto = ? AND usuario_creador_id = ?', [concepto, asistente.id])
+  assert.equal(Number(cantidad), 0)
+  const aceptada = await request(aplicacion).post('/api/obligaciones').auth(token, { type: 'bearer' }).send({ ...entrada, monto: '100000.00' }).expect(201)
+  obligaciones.push(aceptada.body.obligacion.id)
+  assert.equal(aceptada.body.obligacion.monto_original, '100000.00')
+  assert.equal(aceptada.body.obligacion.saldo_pendiente, '100000.00')
+})
+
+test('MySQL real: el límite de un abono se respeta incluso en deudas históricas de mayor importe', async () => {
+  const id = await crearObligacion('200000.00')
+  const rechazada = await enviarAbono(id, nuevaClave(), '100000.01').expect(422)
+  assert.equal(rechazada.body.fields.monto, 'El monto no puede superar S/ 100,000.00.')
+  const [[{ cantidad }]] = await conexiones.execute('SELECT COUNT(*) AS cantidad FROM abonos WHERE obligacion_id = ?', [id])
+  const [[{ saldo_pendiente }]] = await conexiones.execute('SELECT saldo_pendiente FROM obligaciones WHERE id = ?', [id])
+  assert.equal(Number(cantidad), 0)
+  assert.equal(saldo_pendiente, '200000.00')
+  const aceptada = await enviarAbono(id, nuevaClave(), '100000.00').expect(201)
+  assert.equal(aceptada.body.abono.monto, '100000.00')
+  assert.equal(aceptada.body.abono.saldo_resultante, '100000.00')
+})
+
 test('MySQL real: reintentos concurrentes de la misma clave crean un único abono', async () => {
   const obligacionId = await crearObligacion()
   const clave = nuevaClave()

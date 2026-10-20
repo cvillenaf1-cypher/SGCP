@@ -376,8 +376,12 @@ for (const sinObligaciones of [false, true]) {
     await pagina.getByRole('button', { name: 'Agregar nueva deuda' }).click()
     await pagina.getByLabel('Concepto del pago').fill('Nueva deuda del mes')
     await pagina.getByLabel('Beneficiario', { exact: true }).fill('Proveedor nuevo')
-    await pagina.getByLabel('Monto original (S/)', { exact: true }).fill('150.50')
+    await pagina.getByLabel('Monto original (S/)', { exact: true }).fill('100000.01')
     await pagina.getByLabel('Fecha límite', { exact: true }).fill('2026-10-30')
+    await pagina.getByRole('button', { name: 'Registrar pago pendiente', exact: true }).click()
+    await expect(pagina.getByText('El monto no puede superar S/ 100,000.00.', { exact: true })).toBeVisible()
+    expect(solicitudes.filter((entrada) => entrada.camino === '/api/obligaciones' && entrada.metodo === 'POST')).toHaveLength(0)
+    await pagina.getByLabel('Monto original (S/)', { exact: true }).fill('100000.00')
     await pagina.getByRole('button', { name: 'Registrar pago pendiente', exact: true }).click()
     await expect(pagina.getByText('Pago pendiente registrado correctamente.')).toBeVisible()
     await expect(pagina.getByRole('button', { name: 'Volver a pagos del mes', exact: true })).toHaveCount(0)
@@ -385,9 +389,9 @@ for (const sinObligaciones of [false, true]) {
     const fila = pagina.getByRole('table').getByRole('row').filter({ hasText: 'Nueva deuda del mes' })
     await expect(fila).toBeVisible()
     await expect(fila.getByText('Pendiente', { exact: true })).toBeVisible()
-    await expect(fila.getByText('S/ 150.50', { exact: true })).toHaveCount(2)
+    await expect(fila.getByText('S/ 100,000.00', { exact: true })).toHaveCount(2)
     expect(solicitudes.filter((entrada) => entrada.camino === '/api/obligaciones' && entrada.metodo === 'POST')).toEqual([
-      { camino: '/api/obligaciones', metodo: 'POST', cuerpo: { concepto: 'Nueva deuda del mes', beneficiario: 'Proveedor nuevo', monto: '150.50', fecha_limite: '2026-10-30' } },
+      { camino: '/api/obligaciones', metodo: 'POST', cuerpo: { concepto: 'Nueva deuda del mes', beneficiario: 'Proveedor nuevo', monto: '100000.00', fecha_limite: '2026-10-30' } },
     ])
     expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })

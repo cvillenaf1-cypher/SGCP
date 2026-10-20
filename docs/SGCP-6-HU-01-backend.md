@@ -45,7 +45,7 @@ Ejemplo de respuesta HTTP `201` (identificador, creador y fecha ilustrativos):
 - Los cuatro campos son obligatorios. Concepto y beneficiario deben ser cadenas;
   se aplica TRIM y se exige entre 1 y 255 caracteres Unicode.
 - `monto` es una cadena decimal en soles (S/), mayor que cero, con hasta dos
-  decimales y máximo `99999999999.99`, conforme a `DECIMAL(13,2)`. No admite números
+  decimales y máximo `100000.00`. Se conserva `DECIMAL(13,2)` para los datos históricos. No admite números
   JSON, exponentes, comas, espacios ni símbolos de moneda. Se normaliza a dos
   decimales mediante cadenas, sin cálculos monetarios de punto flotante.
 - `fecha_limite` exige una fecha calendario real en formato exacto `YYYY-MM-DD`,
