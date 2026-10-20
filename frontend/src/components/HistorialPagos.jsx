@@ -9,6 +9,7 @@ const formatoFecha = new Intl.DateTimeFormat('es-PE', {
 })
 
 const etiquetasEstado = { PENDIENTE: 'Pendiente', PARCIAL: 'Parcial', PAGADO: 'Pagado' }
+const formatoMes = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', month: 'long', year: 'numeric' })
 
 function normalizarBusqueda(texto) {
   return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-PE').trim()
@@ -157,17 +158,21 @@ export function HistorialPagos() {
   const [seleccionado, establecerSeleccionado] = useState('')
   const [intento, establecerIntento] = useState(0)
   const [busqueda, establecerBusqueda] = useState('')
-  const [filtroEstado, establecerFiltroEstado] = useState('')
+  const [filtroMes, establecerFiltroMes] = useState('')
+  const mesesDisponibles = useMemo(() => [...new Set([
+    ...estado.obligaciones.map((obligacion) => obligacion.fecha_limite?.slice(0, 7)),
+    filtroMes,
+  ].filter((mes) => /^\d{4}-(0[1-9]|1[0-2])$/.test(mes)))].sort((primero, segundo) => segundo.localeCompare(primero)), [estado.obligaciones, filtroMes])
   const indiceBusqueda = useMemo(() => estado.obligaciones.map((obligacion) => ({
     obligacion,
-    texto: normalizarBusqueda([obligacion.id, '#' + obligacion.id, obligacion.concepto, obligacion.beneficiario, obligacion.estado_economico].join(' ')),
+    texto: normalizarBusqueda([obligacion.id, '#' + obligacion.id, obligacion.concepto, obligacion.beneficiario].join(' ')),
   })), [estado.obligaciones])
   const obligacionesVisibles = useMemo(() => {
     const terminos = normalizarBusqueda(busqueda).split(/\s+/).filter(Boolean)
     return indiceBusqueda.filter(({ obligacion, texto }) =>
-      (!filtroEstado || obligacion.estado_economico === filtroEstado)
+      (!filtroMes || obligacion.fecha_limite?.slice(0, 7) === filtroMes)
       && terminos.every((termino) => texto.includes(termino))).map(({ obligacion }) => obligacion)
-  }, [indiceBusqueda, busqueda, filtroEstado])
+  }, [indiceBusqueda, busqueda, filtroMes])
   const obligacionSeleccionada = estado.obligaciones.find((obligacion) => String(obligacion.id) === seleccionado)
   const seleccionFueraDeFiltros = obligacionSeleccionada && !obligacionesVisibles.some((obligacion) => String(obligacion.id) === seleccionado)
   useEffect(() => {
@@ -191,7 +196,7 @@ export function HistorialPagos() {
 
   return <section className="historial-pagos" aria-labelledby="titulo-historial">
     <h3 id="titulo-historial">Consultar historial de pagos</h3>
-    <p className="description">Busca una obligación, filtra por su estado y selecciona su fila para consultar los pagos debajo, incluidas las obligaciones pagadas.</p>
+    <p className="description">Busca una obligación y filtra por el mes de vencimiento para consultar su historial, incluidas las obligaciones pagadas.</p>
     {estado.cargando && <p role="status">Cargando obligaciones…</p>}
     {estado.error && <>
       <p className="error-message" role="alert">{estado.error}</p>
@@ -200,14 +205,12 @@ export function HistorialPagos() {
     {!estado.cargando && !estado.error && <>
       <div className="historial-seleccion">
         <div className="field"><label htmlFor="buscar-historial">Buscar obligaciones</label>
-          <input id="buscar-historial" type="search" value={busqueda} placeholder="Concepto, beneficiario, estado o número" onChange={(evento) => establecerBusqueda(evento.target.value)} />
+          <input id="buscar-historial" type="search" value={busqueda} placeholder="Concepto, beneficiario o número" onChange={(evento) => establecerBusqueda(evento.target.value)} />
         </div>
-        <div className="field"><label htmlFor="estado-historial">Filtrar por estado</label>
-          <select id="estado-historial" value={filtroEstado} onChange={(evento) => establecerFiltroEstado(evento.target.value)}>
-            <option value="">Todos</option>
-            <option value="PAGADO">Pagados</option>
-            <option value="PENDIENTE">Pendientes</option>
-            <option value="PARCIAL">Parciales</option>
+        <div className="field"><label htmlFor="mes-historial">Filtrar por mes</label>
+          <select id="mes-historial" value={filtroMes} onChange={(evento) => establecerFiltroMes(evento.target.value)}>
+            <option value="">Todos los meses</option>
+            {mesesDisponibles.map((mes) => <option key={mes} value={mes}>{formatoMes.format(new Date(`${mes}-15T12:00:00Z`))}</option>)}
           </select>
         </div>
         <div className="historial-acciones">
@@ -217,8 +220,8 @@ export function HistorialPagos() {
       </div>
       <p className="historial-resultados" role="status">{obligacionesVisibles.length} de {estado.obligaciones.length} obligaciones</p>
       {estado.obligaciones.length === 0 ? <p className="empty-state" role="status">Todavía no hay obligaciones registradas para consultar.</p>
-        : obligacionesVisibles.length === 0 ? <p className="empty-state" role="status">{filtroEstado
-          ? 'No hay obligaciones que coincidan con la búsqueda y el estado seleccionado.'
+        : obligacionesVisibles.length === 0 ? <p className="empty-state" role="status">{filtroMes
+          ? 'No hay obligaciones que coincidan con la búsqueda y el mes seleccionado.'
           : 'No hay obligaciones que coincidan con la búsqueda.'}</p>
           : <div className="historial-tabla-contenedor" role="region" aria-label="Tabla de obligaciones" tabIndex={0}>
             <table className="historial-tabla" aria-label="Obligaciones para consultar historial">

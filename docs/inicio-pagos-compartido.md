@@ -63,6 +63,9 @@ obligaciones, abonos y comprobantes siguen siendo exclusivos del ASISTENTE.
 
 Se conserva la consulta mensual histórica del gerente con su selector de período,
 además de las funciones secundarias del asistente y su historial general.
+El historial general del asistente permite buscar por concepto, beneficiario o
+número y filtrar por mes y año de vencimiento. Incluye todos los estados en cada
+período y ofrece **Todos los meses**; el filtro anterior por estado se retira.
 
 No se añaden aprobaciones empresariales ni verificaciones bancarias. Un comprobante
 es evidencia adjunta al registro, no una confirmación bancaria de autenticidad.

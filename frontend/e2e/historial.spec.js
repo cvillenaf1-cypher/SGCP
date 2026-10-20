@@ -181,7 +181,7 @@ test('la tabla permite buscar todas las obligaciones y conserva el detalle al ca
   await expect(tabla.getByRole('row').filter({ hasText: 'Préstamo cancelado' })).toContainText('Pagado')
   await expect(pagina.getByRole('list', { name: 'Historial de abonos' })).toHaveCount(0)
 
-  await busqueda.fill('PRESTAMO prueba PAGADO 8')
+  await busqueda.fill('PRESTAMO prueba 8')
   await expect(botones).toHaveCount(1)
   const pagada = tabla.getByRole('button', { name: 'Ver historial de Préstamo cancelado (#8)', exact: true })
   await pagada.focus()
@@ -191,7 +191,7 @@ test('la tabla permite buscar todas las obligaciones y conserva el detalle al ca
   await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 200.00')
 
   const consultasAntesDeFiltrar = escenario.solicitudes.filter(({ camino }) => camino === '/api/obligaciones/8/historial').length
-  await busqueda.fill('proveedor parcial')
+  await busqueda.fill('proveedor abonos')
   await expect(botones).toHaveCount(1)
   await expect(botones).toHaveAccessibleName('Ver historial de Proveedor con abonos (#7)')
   await expect(resumen(pagina, 'Concepto de la obligación')).toHaveText('Préstamo cancelado')
@@ -212,22 +212,26 @@ test('la tabla permite buscar todas las obligaciones y conserva el detalle al ca
   expect(escenario.solicitudes.filter(({ metodo, camino }) => metodo !== 'GET' && camino !== '/api/auth/login')).toEqual([])
 })
 
-test('el filtro de estado se combina con la búsqueda sin consultar otra vez la API y conserva ambos al actualizar', async ({ page: pagina }) => {
+test('el filtro de mes y año se combina con la búsqueda sin consultar otra vez la API y conserva ambos al actualizar', async ({ page: pagina }) => {
   const escenario = crearEscenario()
-  escenario.obligaciones.forEach((obligacion) => { obligacion.beneficiario = 'Empresa Ándes' })
+  escenario.obligaciones.forEach((obligacion, indice) => {
+    obligacion.beneficiario = 'Empresa Ándes'
+    obligacion.fecha_limite = ['2026-10-31', '2026-09-30', '2027-10-01'][indice]
+  })
   await simularApi(pagina, escenario)
   await abrirHistorial(pagina)
   await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 1,500.00')
   const solicitudesAntesDeFiltrar = [...escenario.solicitudes]
-  const filtro = pagina.getByLabel('Filtrar por estado', { exact: true })
+  await expect(pagina.getByLabel('Filtrar por estado', { exact: true })).toHaveCount(0)
+  const filtro = pagina.getByLabel('Filtrar por mes', { exact: true })
   const busqueda = pagina.getByLabel('Buscar obligaciones', { exact: true })
   const botones = pagina.getByRole('table', { name: 'Obligaciones para consultar historial' }).getByRole('button', { name: /^Ver historial de / })
   await expect(filtro).toHaveValue('')
-  await expect(filtro.getByRole('option')).toHaveText(['Todos', 'Pagados', 'Pendientes', 'Parciales'])
+  await expect(filtro.getByRole('option')).toHaveText(['Todos los meses', 'octubre de 2027', 'octubre de 2026', /^se(?:p)?tiembre de 2026$/])
   await busqueda.fill('EMPRESA andes')
   await expect(botones).toHaveCount(3)
 
-  await filtro.selectOption('PAGADO')
+  await filtro.selectOption('2026-09')
   await expect(botones).toHaveCount(1)
   await expect(botones).toHaveAccessibleName('Ver historial de Préstamo cancelado (#8)')
   await expect(pagina.getByText(/Esta obligación no coincide con los filtros actuales\./)).toBeVisible()
@@ -239,20 +243,20 @@ test('el filtro de estado se combina con la búsqueda sin consultar otra vez la 
   await expect(botones).toHaveCount(3)
   await expect(pagina.getByText(/Esta obligación no coincide con los filtros actuales\./)).toHaveCount(0)
 
-  await filtro.selectOption('PENDIENTE')
+  await filtro.selectOption('2027-10')
   await expect(botones).toHaveCount(1)
   await expect(botones).toHaveAccessibleName('Ver historial de Compromiso sin pagos (#9)')
-  await filtro.selectOption('PARCIAL')
+  await filtro.selectOption('2026-10')
   await expect(botones).toHaveCount(1)
   await expect(botones).toHaveAccessibleName('Ver historial de Proveedor con abonos (#7)')
-  await filtro.selectOption('PAGADO')
+  await filtro.selectOption('2026-09')
   await busqueda.fill('proveedor')
   await expect(botones).toHaveCount(0)
-  await expect(pagina.getByText('No hay obligaciones que coincidan con la búsqueda y el estado seleccionado.', { exact: true })).toBeVisible()
+  await expect(pagina.getByText('No hay obligaciones que coincidan con la búsqueda y el mes seleccionado.', { exact: true })).toBeVisible()
   await expect(resumen(pagina, 'Total acumulado de abonos')).toHaveText('S/ 1,500.00')
   await pagina.getByRole('button', { name: 'Limpiar búsqueda', exact: true }).click()
   await expect(busqueda).toHaveValue('')
-  await expect(filtro).toHaveValue('PAGADO')
+  await expect(filtro).toHaveValue('2026-09')
   await expect(botones).toHaveCount(1)
   await expect(botones).toHaveAccessibleName('Ver historial de Préstamo cancelado (#8)')
   expect(escenario.solicitudes).toEqual(solicitudesAntesDeFiltrar)
@@ -260,15 +264,16 @@ test('el filtro de estado se combina con la búsqueda sin consultar otra vez la 
   await busqueda.fill('EMPRESA andes')
   await pagina.getByRole('button', { name: 'Actualizar obligaciones', exact: true }).click()
   await expect(botones).toHaveCount(1)
-  await expect(filtro).toHaveValue('PAGADO')
+  await expect(filtro).toHaveValue('2026-09')
   await expect(busqueda).toHaveValue('EMPRESA andes')
   await expect(botones).toHaveAccessibleName('Ver historial de Préstamo cancelado (#8)')
   const consultasIniciales = solicitudesAntesDeFiltrar.filter(({ camino }) => camino === '/api/obligaciones').length
+  await pagina.screenshot({ path: '.local/historial-filtro-mes-desktop.png' })
   expect(escenario.solicitudes.filter(({ camino }) => camino === '/api/obligaciones')).toHaveLength(consultasIniciales + 1)
   expect(escenario.solicitudes.filter(({ metodo, camino }) => metodo !== 'GET' && camino !== '/api/auth/login')).toEqual([])
 })
 
-test('en móvil la tabla y el filtro de estado no desbordan la página', async ({ page: pagina }) => {
+test('en móvil la tabla y el filtro de mes no desbordan la página', async ({ page: pagina }) => {
   await pagina.setViewportSize({ width: 390, height: 844 })
   const escenario = crearEscenario()
   await simularApi(pagina, escenario)
@@ -280,8 +285,8 @@ test('en móvil la tabla y el filtro de estado no desbordan la página', async (
   expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
   const busqueda = pagina.getByLabel('Buscar obligaciones', { exact: true })
   await busqueda.fill('PRESTAMO')
-  const filtro = pagina.getByLabel('Filtrar por estado', { exact: true })
-  await filtro.selectOption('PAGADO')
+  const filtro = pagina.getByLabel('Filtrar por mes', { exact: true })
+  await filtro.selectOption('2026-10')
   const pagada = tabla.getByRole('button', { name: 'Ver historial de Préstamo cancelado (#8)', exact: true })
   await pagada.focus()
   await pagina.keyboard.press('Space')
@@ -292,5 +297,6 @@ test('en móvil la tabla y el filtro de estado no desbordan la página', async (
   await expect(filtro).toHaveValue('')
   await expect(busqueda).toHaveValue('PRESTAMO')
   await expect(pagada).toHaveAttribute('aria-pressed', 'true')
+  await pagina.screenshot({ path: '.local/historial-filtro-mes-mobile.png', fullPage: true })
   expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
 })

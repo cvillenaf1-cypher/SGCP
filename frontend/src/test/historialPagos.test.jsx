@@ -4,9 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HistorialPagos } from '../components/HistorialPagos'
 import { ContextoAutenticacion } from '../auth/AuthContext'
 
-const obligacion = { id: 81, concepto: 'Limpieza', beneficiario: 'Servicios Pérez', monto_original: '300.00', saldo_pendiente: '125.50', estado_economico: 'PARCIAL' }
-const pagada = { ...obligacion, id: 82, concepto: 'Alquiler pagado', beneficiario: 'María Núñez', saldo_pendiente: '0.00', estado_economico: 'PAGADO' }
-const pendiente = { ...obligacion, id: 83, concepto: 'Mantenimiento', beneficiario: 'Taller López', saldo_pendiente: '300.00', estado_economico: 'PENDIENTE' }
+const obligacion = { id: 81, concepto: 'Limpieza', beneficiario: 'Servicios Pérez', monto_original: '300.00', saldo_pendiente: '125.50', estado_economico: 'PARCIAL', fecha_limite: '2026-10-01' }
+const pagada = { ...obligacion, id: 82, concepto: 'Alquiler pagado', beneficiario: 'María Núñez', saldo_pendiente: '0.00', estado_economico: 'PAGADO', fecha_limite: '2026-09-30' }
+const pendiente = { ...obligacion, id: 83, concepto: 'Mantenimiento', beneficiario: 'Taller López', saldo_pendiente: '300.00', estado_economico: 'PENDIENTE', fecha_limite: '2027-10-31' }
 const obligacionesMismaEmpresa = [obligacion, pagada, pendiente].map((registro) => ({ ...registro, beneficiario: 'Empresa Álvarez' }))
 const abonos = [
   { id: 7, monto: '100.00', medio_pago: 'Efectivo', fecha_registro: '2026-10-17T15:00:00.000Z', tiene_comprobante: false, puede_descargar_comprobante: false, url_comprobante: null },
@@ -85,10 +85,11 @@ describe('Consultar historial real de pagos — HU-05', () => {
     expect(within(tabla).getByText('S/ 0.00')).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Obligación a consultar' })).not.toBeInTheDocument()
     expect(screen.getByRole('searchbox', { name: 'Buscar obligaciones' })).toBeInTheDocument()
-    const filtroEstado = screen.getByRole('combobox', { name: 'Filtrar por estado' })
-    expect(filtroEstado).toHaveValue('')
-    expect(within(filtroEstado).getAllByRole('option').map((opcion) => [opcion.value, opcion.textContent]))
-      .toEqual([['', 'Todos'], ['PAGADO', 'Pagados'], ['PENDIENTE', 'Pendientes'], ['PARCIAL', 'Parciales']])
+    expect(screen.queryByRole('combobox', { name: 'Filtrar por estado' })).not.toBeInTheDocument()
+    const filtroMes = screen.getByRole('combobox', { name: 'Filtrar por mes' })
+    expect(filtroMes).toHaveValue('')
+    expect(within(filtroMes).getAllByRole('option').map((opcion) => [opcion.value, opcion.textContent]))
+      .toEqual([['', 'Todos los meses'], ['2027-10', 'octubre de 2027'], ['2026-10', 'octubre de 2026'], ['2026-09', expect.stringMatching(/^se(?:p)?tiembre de 2026$/)]])
     expect(screen.queryByRole('region', { name: 'Historial de la obligación' })).not.toBeInTheDocument()
     expect(solicitar.mock.calls.map(([ruta]) => ruta)).toEqual(['/api/obligaciones'])
     expect(registros).toEqual(antes)
@@ -99,10 +100,10 @@ describe('Consultar historial real de pagos — HU-05', () => {
     ['limPIEZA', 'Ver historial de Limpieza (#81)'],
     ['SERVICIOS perez', 'Ver historial de Limpieza (#81)'],
     ['  MARIA    nunez  ', 'Ver historial de Alquiler pagado (#82)'],
-    ['parcial', 'Ver historial de Limpieza (#81)'],
+    ['limpieza #81', 'Ver historial de Limpieza (#81)'],
     ['82', 'Ver historial de Alquiler pagado (#82)'],
-    ['pendiente taller', 'Ver historial de Mantenimiento (#83)'],
-  ])('filtra localmente por concepto, beneficiario, estado o ID con la búsqueda «%s»', async (busqueda, nombre) => {
+    ['mantenimiento taller', 'Ver historial de Mantenimiento (#83)'],
+  ])('filtra localmente por concepto, beneficiario o ID con la búsqueda «%s»', async (busqueda, nombre) => {
     const { solicitar } = prepararHistorial()
     const campo = await screen.findByRole('searchbox', { name: 'Buscar obligaciones' })
     fireEvent.change(campo, { target: { value: busqueda } })
@@ -113,17 +114,17 @@ describe('Consultar historial real de pagos — HU-05', () => {
   })
 
   it.each([
-    ['PAGADO', 'Ver historial de Alquiler pagado (#82)'],
-    ['PENDIENTE', 'Ver historial de Mantenimiento (#83)'],
-    ['PARCIAL', 'Ver historial de Limpieza (#81)'],
-  ])('combina la búsqueda de una empresa con el estado %s sin nuevas consultas ni escrituras', async (estado, nombre) => {
+    ['2026-09', 'Ver historial de Alquiler pagado (#82)'],
+    ['2027-10', 'Ver historial de Mantenimiento (#83)'],
+    ['2026-10', 'Ver historial de Limpieza (#81)'],
+  ])('combina la búsqueda de una empresa con el mes %s sin confundir años ni hacer nuevas consultas', async (mes, nombre) => {
     const antes = structuredClone(obligacionesMismaEmpresa)
     const solicitar = vi.fn().mockResolvedValue({ obligaciones: obligacionesMismaEmpresa })
     prepararHistorial(solicitar)
     const campo = await screen.findByRole('searchbox', { name: 'Buscar obligaciones' })
     fireEvent.change(campo, { target: { value: '  EMPRESA   alvarez ' } })
     expect(botonesDeObligaciones()).toHaveLength(3)
-    fireEvent.change(screen.getByRole('combobox', { name: 'Filtrar por estado' }), { target: { value: estado } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filtrar por mes' }), { target: { value: mes } })
     expect(botonesDeObligaciones().map((boton) => boton.getAttribute('aria-label'))).toEqual([nombre])
     expect(campo).toHaveValue('  EMPRESA   alvarez ')
     expect(screen.getByText('1 de 3 obligaciones')).toBeInTheDocument()
@@ -133,14 +134,44 @@ describe('Consultar historial real de pagos — HU-05', () => {
     comprobarSoloLectura(solicitar)
   })
 
-  it('Todos elimina únicamente el filtro de estado y conserva la búsqueda de la empresa', async () => {
+  it('incluye todos los estados del mes de vencimiento, sin mezclar sus límites con los meses vecinos', async () => {
+    const filas = [
+      { ...obligacion, fecha_limite: '2026-10-01' },
+      { ...pagada, fecha_limite: '2026-10-31' },
+      { ...pendiente, fecha_limite: '2026-10-15' },
+      { ...obligacion, id: 84, fecha_limite: '2026-09-30' },
+      { ...obligacion, id: 85, fecha_limite: '2026-11-01' },
+    ]
+    prepararHistorial(vi.fn().mockResolvedValue({ obligaciones: filas }))
+    const filtro = await screen.findByRole('combobox', { name: 'Filtrar por mes' })
+    fireEvent.change(filtro, { target: { value: '2026-10' } })
+    expect(botonesDeObligaciones().map((boton) => boton.getAttribute('aria-label'))).toEqual([
+      'Ver historial de Limpieza (#81)', 'Ver historial de Alquiler pagado (#82)', 'Ver historial de Mantenimiento (#83)',
+    ])
+    expect(screen.getByText('3 de 5 obligaciones')).toBeInTheDocument()
+  })
+
+  it('conserva el mes seleccionado si al actualizar ya no quedan obligaciones de ese período', async () => {
+    const solicitar = vi.fn().mockResolvedValueOnce({ obligaciones: [obligacion, pagada] }).mockResolvedValue({ obligaciones: [pagada] })
+    prepararHistorial(solicitar)
+    const filtro = await screen.findByRole('combobox', { name: 'Filtrar por mes' })
+    fireEvent.change(filtro, { target: { value: '2026-10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar obligaciones' }))
+    const actualizado = await screen.findByRole('combobox', { name: 'Filtrar por mes' })
+    expect(actualizado).toHaveValue('2026-10')
+    expect(screen.getByText('No hay obligaciones que coincidan con la búsqueda y el mes seleccionado.')).toBeInTheDocument()
+    fireEvent.change(actualizado, { target: { value: '' } })
+    expect(botonesDeObligaciones()).toHaveLength(1)
+  })
+
+  it('Todos los meses elimina únicamente el filtro de mes y conserva la búsqueda de la empresa', async () => {
     const otraEmpresa = { ...pagada, id: 84, concepto: 'Pago de otra empresa', beneficiario: 'Empresa Torres' }
     const solicitar = vi.fn().mockResolvedValue({ obligaciones: [...obligacionesMismaEmpresa, otraEmpresa] })
     prepararHistorial(solicitar)
     const campo = await screen.findByRole('searchbox', { name: 'Buscar obligaciones' })
     fireEvent.change(campo, { target: { value: 'alvarez' } })
-    const filtro = screen.getByRole('combobox', { name: 'Filtrar por estado' })
-    fireEvent.change(filtro, { target: { value: 'PAGADO' } })
+    const filtro = screen.getByRole('combobox', { name: 'Filtrar por mes' })
+    fireEvent.change(filtro, { target: { value: '2026-09' } })
     expect(botonesDeObligaciones()).toHaveLength(1)
     fireEvent.change(filtro, { target: { value: '' } })
     expect(campo).toHaveValue('alvarez')
@@ -149,35 +180,35 @@ describe('Consultar historial real de pagos — HU-05', () => {
     expect(solicitar).toHaveBeenCalledTimes(1)
   })
 
-  it('Limpiar búsqueda conserva el estado seleccionado y muestra los demás compromisos de ese estado', async () => {
+  it('Limpiar búsqueda conserva el mes seleccionado y muestra los demás compromisos de ese mes', async () => {
     const otraEmpresa = { ...pagada, id: 84, concepto: 'Pago de otra empresa', beneficiario: 'Empresa Torres' }
     const solicitar = vi.fn().mockResolvedValue({ obligaciones: [...obligacionesMismaEmpresa, otraEmpresa] })
     prepararHistorial(solicitar)
     const campo = await screen.findByRole('searchbox', { name: 'Buscar obligaciones' })
-    const filtro = screen.getByRole('combobox', { name: 'Filtrar por estado' })
-    fireEvent.change(filtro, { target: { value: 'PAGADO' } })
+    const filtro = screen.getByRole('combobox', { name: 'Filtrar por mes' })
+    fireEvent.change(filtro, { target: { value: '2026-09' } })
     fireEvent.change(campo, { target: { value: 'alvarez' } })
     expect(botonesDeObligaciones()).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }))
     expect(campo).toHaveValue('')
-    expect(filtro).toHaveValue('PAGADO')
+    expect(filtro).toHaveValue('2026-09')
     expect(botonesDeObligaciones().map((boton) => boton.getAttribute('aria-label')))
       .toEqual(['Ver historial de Alquiler pagado (#82)', 'Ver historial de Pago de otra empresa (#84)'])
     expect(solicitar).toHaveBeenCalledTimes(1)
   })
 
-  it('distingue una combinación de búsqueda y estado sin coincidencias del catálogo vacío', async () => {
+  it('distingue una combinación de búsqueda y mes sin coincidencias del catálogo vacío', async () => {
     const { solicitar } = prepararHistorial()
     const campo = await screen.findByRole('searchbox', { name: 'Buscar obligaciones' })
-    const filtro = screen.getByRole('combobox', { name: 'Filtrar por estado' })
+    const filtro = screen.getByRole('combobox', { name: 'Filtrar por mes' })
     fireEvent.change(campo, { target: { value: 'Limpieza' } })
-    fireEvent.change(filtro, { target: { value: 'PAGADO' } })
-    expect(screen.getByText('No hay obligaciones que coincidan con la búsqueda y el estado seleccionado.')).toBeInTheDocument()
+    fireEvent.change(filtro, { target: { value: '2026-09' } })
+    expect(screen.getByText('No hay obligaciones que coincidan con la búsqueda y el mes seleccionado.')).toBeInTheDocument()
     expect(screen.queryByText('Todavía no hay obligaciones registradas para consultar.')).not.toBeInTheDocument()
     expect(screen.queryAllByRole('button', { name: /^Ver historial de / })).toHaveLength(0)
     fireEvent.change(filtro, { target: { value: '' } })
     expect(botonesDeObligaciones().map((boton) => boton.getAttribute('aria-label'))).toEqual(['Ver historial de Limpieza (#81)'])
-    expect(screen.queryByText('No hay obligaciones que coincidan con la búsqueda y el estado seleccionado.')).not.toBeInTheDocument()
+    expect(screen.queryByText('No hay obligaciones que coincidan con la búsqueda y el mes seleccionado.')).not.toBeInTheDocument()
     fireEvent.change(campo, { target: { value: 'inexistente' } })
     expect(screen.getByText('No hay obligaciones que coincidan con la búsqueda.')).toBeInTheDocument()
     expect(solicitar).toHaveBeenCalledTimes(1)
@@ -238,18 +269,18 @@ describe('Consultar historial real de pagos — HU-05', () => {
     comprobarSoloLectura(solicitar)
   })
 
-  it('conserva el detalle seleccionado cuando el estado lo oculta y avisa de los filtros sin volver a consultar', async () => {
+  it('conserva el detalle seleccionado cuando el mes lo oculta y avisa de los filtros sin volver a consultar', async () => {
     const { solicitar } = prepararHistorial()
     await seleccionarObligacion()
     const lista = await screen.findByRole('list', { name: 'Historial de abonos' })
     const detalle = screen.getByRole('region', { name: 'Historial de la obligación' })
-    const filtro = screen.getByRole('combobox', { name: 'Filtrar por estado' })
-    fireEvent.change(filtro, { target: { value: 'PAGADO' } })
+    const filtro = screen.getByRole('combobox', { name: 'Filtrar por mes' })
+    fireEvent.change(filtro, { target: { value: '2026-09' } })
     expect(screen.queryByRole('button', { name: 'Ver historial de Limpieza (#81)' })).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Historial de la obligación' })).toBe(detalle)
     expect(screen.getByRole('list', { name: 'Historial de abonos' })).toBe(lista)
     expect(screen.getByText(/Esta obligación no coincide con los filtros actuales\./)).toBeInTheDocument()
-    fireEvent.change(filtro, { target: { value: 'PARCIAL' } })
+    fireEvent.change(filtro, { target: { value: '2026-10' } })
     expect(screen.getByRole('button', { name: 'Ver historial de Limpieza (#81)' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByText(/Esta obligación no coincide con los filtros actuales\./)).not.toBeInTheDocument()
     expect(solicitar.mock.calls.map(([ruta]) => ruta)).toEqual(['/api/obligaciones', '/api/obligaciones/81/historial'])
@@ -470,17 +501,17 @@ describe('Consultar historial real de pagos — HU-05', () => {
     comprobarSoloLectura(solicitar)
   })
 
-  it('conserva la búsqueda y el estado al actualizar obligaciones y limpia la selección anterior', async () => {
+  it('conserva la búsqueda y el mes al actualizar obligaciones y limpia la selección anterior', async () => {
     const { solicitar } = prepararHistorial()
     const campo = await screen.findByRole('searchbox', { name: 'Buscar obligaciones' })
     fireEvent.change(campo, { target: { value: 'perez' } })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Filtrar por estado' }), { target: { value: 'PARCIAL' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filtrar por mes' }), { target: { value: '2026-10' } })
     await seleccionarObligacion()
     await screen.findByRole('list', { name: 'Historial de abonos' })
     fireEvent.click(screen.getByRole('button', { name: 'Actualizar obligaciones' }))
     const campoActualizado = await screen.findByRole('searchbox', { name: 'Buscar obligaciones' })
     expect(campoActualizado).toHaveValue('perez')
-    expect(screen.getByRole('combobox', { name: 'Filtrar por estado' })).toHaveValue('PARCIAL')
+    expect(screen.getByRole('combobox', { name: 'Filtrar por mes' })).toHaveValue('2026-10')
     expect(botonesDeObligaciones()).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Ver historial de Limpieza (#81)' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByRole('region', { name: 'Historial de la obligación' })).not.toBeInTheDocument()
