@@ -7,6 +7,7 @@ import { PaginaInicioSesion } from './pages/LoginPage'
 import { PaginaPanel } from './pages/DashboardPage'
 import { PaginaGerente } from './gerente/PaginaGerente'
 import { PaginaPagosDelMes } from './gerente/PaginaPagosDelMes'
+import { PaginaResumenMensual } from './gerente/PaginaResumenMensual'
 import './App.css'
 
 function Aplicacion() {
@@ -36,9 +37,8 @@ function Aplicacion() {
 
   return (
     <div
-      className={`app-shell ${
-        esPaginaInicioSesion ? 'app-shell--login' : esModuloGerente ? 'app-shell--gerente' : ''
-      }`}
+      className={`app-shell ${esPaginaInicioSesion ? 'app-shell--login' : esModuloGerente ? 'app-shell--gerente' : ''
+        }`}
     >
 
       {/* Encabezado: visible solamente fuera del login */}
@@ -128,6 +128,10 @@ function Aplicacion() {
             <Route
               path="/gerente/pagos-del-mes"
               element={<PaginaPagosDelMes />}
+            />
+            <Route
+              path="/gerente/resumen-mensual"
+              element={<PaginaResumenMensual />}
             />
           </Route>
 

@@ -116,11 +116,6 @@ export function PaginaPagosDelMes({ consultarPagos = consultarPagosDelMes }) {
           <p className="etiqueta-gerente">CONSULTA MENSUAL</p>
           <h2 id="titulo-pagos-mes">Consultar pagos del mes</h2>
         </div>
-
-        <span className="insignia-lectura">
-          <IconoGerente nombre="candado" />
-          Solo lectura
-        </span>
       </div>
 
       <div className="tarjeta-periodo">

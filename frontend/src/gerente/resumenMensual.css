@@ -1,0 +1,54 @@
+.indicadores-resumen {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  padding: 0 28px 28px;
+}
+
+.tarjeta-indicador {
+  padding: 22px 18px;
+  border: 1px solid #c9e7dc;
+  border-top: 4px solid #008b61;
+  border-radius: 14px;
+  background: #eef9f4;
+  min-width: 0;
+}
+
+.tarjeta-indicador h4 {
+  margin: 0;
+  color: #006747;
+  font-size: 0.88rem;
+}
+
+.tarjeta-indicador p {
+  color: #52677b;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.tarjeta-indicador .importe-resumen {
+  margin: 14px 0;
+  color: #006747;
+  font-size: clamp(1.3rem, 2.3vw, 1.85rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1000px) {
+  .indicadores-resumen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .indicadores-resumen { grid-template-columns: 1fr; padding: 0 20px 20px; }
+}
+
+.mensaje-resumen-vacio {
+  margin: 12px 0 0;
+  padding: 0 0 16px 30px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #234b91;
+  text-align: left;
+}

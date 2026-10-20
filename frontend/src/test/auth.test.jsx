@@ -60,7 +60,7 @@ describe('Acceso SGCP', () => {
         expect(screen.queryByRole('button', { name: 'Consultar historial de pagos' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Registrar pagos realizados' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Consultar pagos pendientes' })).not.toBeInTheDocument()
-        expect(screen.getByText('Solo lectura')).toBeInTheDocument()
+        expect(screen.queryByText('Solo lectura')).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Registrar pago pendiente' })).not.toBeInTheDocument()
         await userEvent.click(screen.getByText('Ir a asistente (prueba)'))
         expect(screen.getByRole('heading', { name: 'Acceso no permitido' })).toBeInTheDocument()
