@@ -1,5 +1,9 @@
 # SGCP-9 — HU-04 | Comprobante opcional privado
 
+> Documento de la entrega original. Para nuevos pagos, el contrato vigente exige
+> evidencia obligatoria en JPG, PNG o PDF dentro de la misma solicitud del abono.
+> Consulta [Evidencia obligatoria](evidencia-obligatoria.md) y aplica la migración 005.
+
 El medio de pago obligatorio ya pertenece a HU-03 y conserva sus cuatro valores.
 HU-04 agrega un comprobante opcional por abono, sin modificar importes, historial
 monetario ni el contrato JSON de POST /api/obligaciones/:id/abonos. No mueve dinero.

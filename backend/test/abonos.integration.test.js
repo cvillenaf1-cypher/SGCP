@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, before, test } from 'node:test'
 import request from 'supertest'
+import { adjuntarComprobante, eliminarComprobantesDeObligacion } from './support/comprobante.js'
 import { crearAplicacion } from '../src/app.js'
 import { abrirBasePruebas, crearUsuarioPrueba, eliminarUsuarioPrueba } from './support/database.js'
 
@@ -25,6 +26,7 @@ after(async () => {
   if (!conexiones) return
   try {
     for (const obligacionId of obligaciones) {
+      await eliminarComprobantesDeObligacion(conexiones, obligacionId)
       await conexiones.execute('DELETE FROM abonos WHERE obligacion_id = ?', [obligacionId])
       await conexiones.execute('DELETE FROM obligaciones WHERE id = ?', [obligacionId])
     }
@@ -46,9 +48,8 @@ async function crearObligacion(saldo = '10.00') {
 }
 
 function enviarAbono(obligacionId, clave, monto = '4.00') {
-  return request(aplicacion).post(`/api/obligaciones/${obligacionId}/abonos`)
-    .auth(token, { type: 'bearer' })
-    .send({ monto, medio_pago: 'Transferencia bancaria', clave_idempotencia: clave })
+  return adjuntarComprobante(request(aplicacion).post(`/api/obligaciones/${obligacionId}/abonos`)
+    .auth(token, { type: 'bearer' }), { monto, medio_pago: 'Transferencia bancaria', clave_idempotencia: clave })
 }
 
 function nuevaClave() {

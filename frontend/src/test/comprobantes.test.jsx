@@ -6,9 +6,10 @@ import { FormularioAbono } from '../components/FormularioAbono'
 import { ContextoAutenticacion } from '../auth/AuthContext'
 import { tamanoMaximoComprobante, validarComprobante } from '../lib/validarComprobante'
 
+const etiqueta = 'Comprobante o factura (obligatorio)'
 beforeEach(() => {
   vi.stubGlobal('URL', class extends URL {
-    static createObjectURL = vi.fn().mockReturnValue('blob:comprobante-local')
+    static createObjectURL = vi.fn(() => 'blob:comprobante-local')
     static revokeObjectURL = vi.fn()
   })
 })
@@ -19,161 +20,111 @@ function SelectorPrueba() {
   const [error, establecerError] = useState('')
   return <SelectorComprobante archivo={archivo} error={error} alCambiar={(nuevo, fallo) => { establecerArchivo(nuevo); establecerError(fallo) }} />
 }
+function adjuntar(nombre = 'recibo.png', tipo = 'image/png') {
+  const archivo = new File(['evidencia'], nombre, { type: tipo })
+  fireEvent.change(screen.getByLabelText(etiqueta), { target: { files: [archivo] } })
+  return archivo
+}
 
-describe('Validación del comprobante opcional', () => {
-  it('permite no adjuntar archivo', () => expect(validarComprobante(null)).toBe(''))
-  for (const [nombre, tipo] of [['recibo.jpg', 'image/jpeg'], ['recibo.JPEG', 'image/jpeg'], ['recibo.png', 'image/png']]) {
-    it(`admite ${nombre} hasta el límite de 5 MB`, () => {
-      expect(validarComprobante({ name: nombre, type: tipo, size: tamanoMaximoComprobante })).toBe('')
-    })
+describe('Evidencia obligatoria', () => {
+  it('rechaza la ausencia de archivo', () => expect(validarComprobante(null)).toMatch(/obligatoria/))
+  for (const [name, type] of [['recibo.jpg', 'image/jpeg'], ['recibo.JPEG', 'image/jpeg'], ['recibo.png', 'image/png'], ['factura.PDF', 'application/pdf']]) {
+    it(`admite ${name} hasta 5 MB`, () => expect(validarComprobante({ name, type, size: tamanoMaximoComprobante })).toBe(''))
   }
-  it('rechaza más de 5 MB', () => {
-    expect(validarComprobante({ name: 'recibo.png', type: 'image/png', size: tamanoMaximoComprobante + 1 })).toBe('El comprobante no debe superar los 5 MB.')
+  it('rechaza tamaño excesivo, archivos vacíos y contenido declarado incompatible', () => {
+    expect(validarComprobante({ name: 'a.pdf', type: 'application/pdf', size: tamanoMaximoComprobante + 1 })).toMatch(/5 MB/)
+    expect(validarComprobante(new File([], 'a.pdf', { type: 'application/pdf' }))).toMatch(/vacío/)
+    expect(validarComprobante(new File(['x'], 'a.png', { type: 'application/pdf' }))).toMatch(/JPG, PNG o PDF/)
+    expect(validarComprobante(new File(['x'], 'a.svg', { type: 'image/svg+xml' }))).toMatch(/JPG, PNG o PDF/)
   })
-  it('rechaza formatos distintos, MIME incorrecto y archivos vacíos', () => {
-    expect(validarComprobante(new File(['datos'], 'recibo.pdf', { type: 'application/pdf' }))).toMatch(/JPG o PNG/)
-    expect(validarComprobante(new File(['datos'], 'recibo.png', { type: 'image/svg+xml' }))).toMatch(/JPG o PNG/)
-    expect(validarComprobante(new File([], 'recibo.png', { type: 'image/png' }))).toMatch(/vacío/)
-  })
-})
-
-describe('Selector de comprobante — HU-04', () => {
-  it('muestra archivo y vista previa local; quitar libera la URL', () => {
+  it('presenta la imagen y libera su vista previa al quitarla', () => {
     render(<SelectorPrueba />)
-    fireEvent.change(screen.getByLabelText('Comprobante (opcional)'), { target: { files: [new File(['imagen'], 'recibo.png', { type: 'image/png' })] } })
-    expect(screen.getByText('recibo.png')).toBeInTheDocument()
+    expect(screen.getByLabelText(etiqueta)).toBeRequired()
+    adjuntar()
     expect(screen.getByRole('img')).toHaveAttribute('src', 'blob:comprobante-local')
-    expect(screen.getByText(/Vista previa local: el archivo aún no se ha subido/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Quitar comprobante' }))
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:comprobante-local')
   })
-  it('muestra el error bajo el campo y permite descartarlo', () => {
+  it('identifica un PDF sin intentar mostrarlo como imagen', () => {
     render(<SelectorPrueba />)
-    fireEvent.change(screen.getByLabelText('Comprobante (opcional)'), { target: { files: [new File(['datos'], 'recibo.pdf', { type: 'application/pdf' })] } })
-    expect(screen.getByRole('alert')).toHaveTextContent('El comprobante debe ser una imagen JPG o PNG.')
-    expect(screen.getByLabelText('Comprobante (opcional)')).toHaveAttribute('aria-invalid', 'true')
+    adjuntar('factura.pdf', 'application/pdf')
+    expect(screen.getByText('Documento PDF seleccionado.')).toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(URL.createObjectURL).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Descartar archivo rechazado' }))
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
   it('rechaza una imagen que no se puede visualizar', () => {
     render(<SelectorPrueba />)
-    fireEvent.change(screen.getByLabelText('Comprobante (opcional)'), { target: { files: [new File(['datos'], 'recibo.png', { type: 'image/png' })] } })
+    adjuntar()
     fireEvent.error(screen.getByRole('img'))
     expect(screen.getByRole('alert')).toHaveTextContent('No se pudo visualizar el comprobante.')
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
-  it('libera la URL al desmontar la vista', () => {
-    const vista = render(<SelectorPrueba />)
-    fireEvent.change(screen.getByLabelText('Comprobante (opcional)'), { target: { files: [new File(['imagen'], 'recibo.jpg', { type: 'image/jpeg' })] } })
-    vista.unmount()
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:comprobante-local')
-  })
 })
 
-describe('Integración con registro de abonos', () => {
-  it('conserva el registro real sin comprobante al quitar el archivo seleccionado', async () => {
-    const obligacion = { id: 81, concepto: 'Servicio', beneficiario: 'Proveedor', monto_original: '100.00', saldo_pendiente: '100.00', estado_economico: 'PENDIENTE' }
-    const solicitar = vi.fn().mockImplementation((ruta, opciones) => {
-      if (opciones.method === 'POST') return Promise.resolve({ abono: { obligacion_id: 81, saldo_resultante: '90.00' } })
-      return Promise.resolve(ruta === '/api/obligaciones' ? { obligaciones: [obligacion] } : { obligacion })
-    })
-    render(<ContextoAutenticacion.Provider value={{ solicitar }}><FormularioAbono /></ContextoAutenticacion.Provider>)
-    await screen.findByRole('option', { name: /Servicio/ })
-    fireEvent.change(screen.getByLabelText('Pago pendiente'), { target: { value: '81' } })
-    await screen.findByLabelText('Monto del abono (S/)')
-    fireEvent.change(screen.getByLabelText('Monto del abono (S/)'), { target: { value: '10.00' } })
-    fireEvent.change(screen.getByLabelText('Medio de pago'), { target: { value: 'Efectivo' } })
-    fireEvent.change(screen.getByLabelText('Comprobante (opcional)'), { target: { files: [new File(['imagen'], 'recibo.png', { type: 'image/png' })] } })
-    expect(solicitar.mock.calls.filter(([, opciones]) => opciones.method === 'POST')).toHaveLength(0)
-    fireEvent.click(screen.getByRole('button', { name: 'Quitar comprobante' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
-    await waitFor(() => expect(solicitar.mock.calls.filter(([, opciones]) => opciones.method === 'POST')).toHaveLength(1))
-    expect(solicitar.mock.calls.find(([, opciones]) => opciones.method === 'POST')[1].body).toEqual({ monto: '10.00', medio_pago: 'Efectivo', clave_idempotencia: expect.any(String) })
-  })
-})
-
-describe('Conexión real de contratos HU-03 y HU-04', () => {
+describe('Registro conjunto de abono y comprobante', () => {
   const obligacion = { id: 81, concepto: 'Servicio', beneficiario: 'Proveedor', monto_original: '100.00', saldo_pendiente: '100.00', estado_economico: 'PENDIENTE' }
-  const metadatos = { abono_id: 18, nombre: 'recibo.png', tipo: 'image/png', tamano: 20 }
-  async function preparar({ cargar, saldo = '90.00' } = {}) {
+  const resultado = { message: 'Abono registrado correctamente.', abono: { id: 18, obligacion_id: 81, saldo_resultante: '90.00' }, comprobante: { abono_id: 18, nombre: 'factura.pdf', tipo: 'application/pdf' } }
+  async function preparar(registrar = vi.fn().mockResolvedValue(resultado)) {
     let registrado = false
     const solicitar = vi.fn(async (ruta, opciones = {}) => {
+      if (opciones.method === 'POST') { const respuesta = await registrar(opciones.body); registrado = true; return respuesta }
       if (ruta === '/api/obligaciones') return { obligaciones: [obligacion] }
-      if (ruta === '/api/obligaciones/81/abonos') { registrado = true; return { message: 'Abono registrado correctamente.', abono: { id: 18, obligacion_id: 81, saldo_resultante: saldo } } }
-      if (ruta === '/api/abonos/18/comprobante' && opciones.method === 'POST') {
-        if (cargar) return cargar(opciones.body)
-        return { comprobante: metadatos }
-      }
-      if (ruta === '/api/abonos/18/comprobante') return { tiene_comprobante: true, comprobante: metadatos }
-      return { obligacion: registrado ? { ...obligacion, saldo_pendiente: saldo, estado_economico: saldo === '0.00' ? 'PAGADO' : 'PARCIAL' } : obligacion }
+      return { obligacion: registrado ? { ...obligacion, saldo_pendiente: '90.00' } : obligacion }
     })
     render(<ContextoAutenticacion.Provider value={{ solicitar }}><FormularioAbono /></ContextoAutenticacion.Provider>)
     await screen.findByRole('option', { name: /Servicio/ })
     fireEvent.change(screen.getByLabelText('Pago pendiente'), { target: { value: '81' } })
-    await screen.findByLabelText('Monto del abono (S/)')
+    fireEvent.change(await screen.findByLabelText('Monto del abono (S/)'), { target: { value: '10.00' } })
+    fireEvent.change(screen.getByLabelText('Medio de pago'), { target: { value: 'Efectivo' } })
+    return { solicitar, registrar }
+  }
+  it('no envía el abono después de quitar la evidencia', async () => {
+    const { registrar } = await preparar()
+    adjuntar()
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar comprobante' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('La evidencia es obligatoria')
+    expect(screen.getByLabelText(etiqueta)).toHaveFocus()
+    expect(registrar).not.toHaveBeenCalled()
+  })
+  it('envía monto, medio, clave y PDF en una petición; exige evidencia para el siguiente abono', async () => {
+    const { solicitar, registrar } = await preparar()
+    const archivo = adjuntar('factura.pdf', 'application/pdf')
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
+    await screen.findByText('Evidencia guardada: factura.pdf')
+    const cuerpo = registrar.mock.calls[0][0]
+    expect(cuerpo.get('monto')).toBe('10.00')
+    expect(cuerpo.get('medio_pago')).toBe('Efectivo')
+    expect(cuerpo.get('clave_idempotencia')).toBeTruthy()
+    expect(cuerpo.get('comprobante')).toBe(archivo)
+    expect(solicitar.mock.calls.filter(([, opciones]) => opciones?.method === 'POST').map(([ruta]) => ruta)).toEqual(['/api/obligaciones/81/abonos'])
+    expect(await screen.findByLabelText(etiqueta)).toHaveValue('')
     fireEvent.change(screen.getByLabelText('Monto del abono (S/)'), { target: { value: '10.00' } })
     fireEvent.change(screen.getByLabelText('Medio de pago'), { target: { value: 'Efectivo' } })
-    const archivo = new File(['imagen'], 'recibo.png', { type: 'image/png' })
-    fireEvent.change(screen.getByLabelText('Comprobante (opcional)'), { target: { files: [archivo] } })
     fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
-    return { solicitar, archivo }
-  }
-
-  it('usa el ID del abono y multipart, confirma solo el archivo guardado', async () => {
-    const { solicitar, archivo } = await preparar()
-    await screen.findByText('Comprobante asociado correctamente.')
-    const llamadas = solicitar.mock.calls.filter(([, opciones]) => opciones?.method === 'POST')
-    expect(llamadas.map(([ruta]) => ruta)).toEqual(['/api/obligaciones/81/abonos', '/api/abonos/18/comprobante'])
-    expect(llamadas[0][1].body).not.toHaveProperty('comprobante')
-    expect(llamadas[1][1].body).toBeInstanceOf(FormData)
-    expect(llamadas[1][1].body.get('comprobante')).toBe(archivo)
-    expect(screen.getByText('Comprobante guardado: recibo.png')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Registrar abono' })).not.toBeInTheDocument()
+    expect(registrar).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('alert')).toHaveTextContent('La evidencia es obligatoria')
   })
-
-  it('al fallar la carga reintenta solo el archivo y conserva los mismos bytes', async () => {
-    const carga = vi.fn().mockRejectedValueOnce(Object.assign(new Error('Error de red'), { status: 0 }))
-      .mockResolvedValueOnce({ comprobante: metadatos })
-    const { solicitar, archivo } = await preparar({ cargar: carga })
-    expect(await screen.findByRole('alert')).toHaveTextContent('El abono ya está registrado')
-    expect(screen.queryByText('Comprobante asociado correctamente.')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Comprobante (opcional)')).toBeDisabled()
-    expect(screen.getByLabelText('Pago pendiente')).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Actualizar obligaciones' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Reintentar comprobante' }))
-    await screen.findByText('Comprobante asociado correctamente.')
-    expect(solicitar.mock.calls.filter(([ruta]) => ruta === '/api/obligaciones/81/abonos')).toHaveLength(1)
-    expect(carga).toHaveBeenCalledTimes(2)
-    expect(carga.mock.calls.every(([cuerpo]) => cuerpo.get('comprobante') === archivo)).toBe(true)
+  it('un fallo de conexión conserva el archivo y clave sin anunciar éxito', async () => {
+    const registrar = vi.fn().mockRejectedValueOnce(new Error('Respuesta perdida')).mockResolvedValueOnce(resultado)
+    await preparar(registrar)
+    adjuntar('factura.pdf', 'application/pdf')
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
+    await screen.findByRole('button', { name: 'Reintentar registro' })
+    expect(screen.queryByText('Abono registrado correctamente.')).not.toBeInTheDocument()
+    expect(screen.getByLabelText(etiqueta)).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar registro' }))
+    await screen.findByText('Evidencia guardada: factura.pdf')
+    expect(registrar.mock.calls[0][0]).toBe(registrar.mock.calls[1][0])
   })
-
-  it('permite consultar la confirmación perdida sin repetir el abono ni la carga', async () => {
-    const { solicitar } = await preparar({ cargar: () => Promise.reject(new Error('Respuesta perdida')) })
-    await screen.findByRole('alert')
-    fireEvent.click(screen.getByRole('button', { name: 'Consultar comprobante' }))
-    await screen.findByText('El servidor confirma que el abono tiene comprobante.')
-    expect(screen.getByRole('button', { name: 'Descargar comprobante' })).toBeEnabled()
-    expect(solicitar.mock.calls.filter(([ruta, opciones]) => ruta.endsWith('/abonos') && opciones?.method === 'POST')).toHaveLength(1)
-    expect(solicitar.mock.calls.filter(([, opciones]) => opciones?.body instanceof FormData)).toHaveLength(1)
-  })
-
-  for (const estado of [422, 403]) {
-    it(`muestra error ${estado} de carga sin deshacer ni duplicar el abono`, async () => {
-      const { solicitar } = await preparar({ cargar: () => Promise.reject(Object.assign(new Error('Archivo rechazado o sin permiso'), { status: estado })) })
-      expect(await screen.findByRole('alert')).toHaveTextContent('Archivo rechazado o sin permiso')
-      expect(screen.queryByText('Comprobante asociado correctamente.')).not.toBeInTheDocument()
-      expect(solicitar.mock.calls.filter(([ruta]) => ruta.endsWith('/abonos'))).toHaveLength(1)
-    })
-  }
-
-  it('con saldo cero sigue disponible el reintento y la consulta del comprobante', async () => {
-    await preparar({ saldo: '0.00', cargar: () => Promise.reject(new Error('Respuesta perdida')) })
-    await screen.findByText(/Respuesta perdida.*El abono ya está registrado/)
-    expect(await screen.findByText('Esta obligación ya está pagada. Selecciona otra obligación con saldo disponible.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Reintentar comprobante' })).toBeEnabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Consultar comprobante' }))
-    await screen.findByText('El servidor confirma que el abono tiene comprobante.')
+  it('un archivo rechazado permite corregir la evidencia sin confirmar un pago', async () => {
+    const registrar = vi.fn().mockRejectedValue(Object.assign(new Error('Revisa la evidencia'), { status: 422, fields: { comprobante: 'PDF inválido.' } }))
+    await preparar(registrar)
+    adjuntar('factura.pdf', 'application/pdf')
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
+    await screen.findByText('PDF inválido.')
+    await waitFor(() => expect(screen.getByLabelText(etiqueta)).toBeEnabled())
+    expect(screen.queryByText('Abono registrado correctamente.')).not.toBeInTheDocument()
   })
 })

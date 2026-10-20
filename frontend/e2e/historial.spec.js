@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { leerAbono, adjuntarEvidencia } from './support/comprobante.js'
 
 const tokenPrueba = 'sesion-simulada-solo-historial'
 const imagenPrueba = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==', 'base64')
@@ -56,16 +57,16 @@ async function simularApi(pagina, escenario) {
     const detalle = camino.match(/^\/api\/obligaciones\/(\d+)$/)
     if (detalle && metodo === 'GET') return responder({ obligacion: escenario.obligaciones.find((entrada) => String(entrada.id) === detalle[1]) })
     if (camino === '/api/obligaciones/7/abonos' && metodo === 'POST') {
-      const entrada = solicitud.postDataJSON()
+      const entrada = leerAbono(solicitud)
       expect(entrada).toMatchObject({ monto: '250.00', medio_pago: 'Efectivo' })
       expect(entrada.clave_idempotencia).toMatch(/^[\da-f-]{36}$/i)
       const abono = { id: 13, obligacion_id: 7, monto: entrada.monto, medio_pago: entrada.medio_pago, fecha_registro: new Date().toISOString(), saldo_resultante: '1250.00' }
       escenario.abonos[7].push({ ...abono, tiene_comprobante: false, puede_descargar_comprobante: false, url_comprobante: null })
       escenario.obligaciones[0].saldo_pendiente = '1250.00'
-      return responder({ message: 'Abono registrado correctamente.', abono }, 201)
+      return responder({ message: 'Abono registrado correctamente.', abono, comprobante: { abono_id: abono.id, nombre: 'recibo.png', tipo: 'image/png' } }, 201)
     }
     if (camino === '/api/abonos/11/comprobante/archivo' && metodo === 'GET') {
-      expect(solicitud.headers().accept).toBe('image/png, image/jpeg')
+      expect(solicitud.headers().accept).toBe('image/png, image/jpeg, application/pdf')
       if (escenario.fallarComprobante) return responder({ message: 'No se pudo consultar el comprobante.' }, 503)
       return ruta.fulfill({ status: 200, headers: cabecerasCors, contentType: 'image/png', body: imagenPrueba })
     }
@@ -131,6 +132,7 @@ test('un nuevo abono aparece al volver al historial y conserva los pagos anterio
   await pagina.getByRole('dialog').getByRole('button', { name: 'Registrar pago', exact: true }).click()
   await pagina.getByLabel('Monto del abono (S/)').fill('250.00')
   await pagina.getByLabel('Medio de pago', { exact: true }).selectOption('Efectivo')
+  await adjuntarEvidencia(pagina)
   await pagina.getByRole('button', { name: 'Registrar abono', exact: true }).click()
   await expect(pagina.getByText('Abono registrado correctamente.', { exact: true })).toBeVisible()
   await pagina.getByRole('button', { name: 'Cerrar detalles', exact: true }).click()

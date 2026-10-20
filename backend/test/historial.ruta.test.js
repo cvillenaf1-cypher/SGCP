@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
 import request from 'supertest'
+import { registrarAbono } from '../src/abonos/servicio.js'
 import { crearAplicacion } from '../src/app.js'
 
 const token = 'a'.repeat(64)
@@ -57,7 +58,7 @@ async function prepararEscenario({ rol = 'ASISTENTE', existente = true, vacio = 
     pool: { execute: ejecutar, getConnection: async () => conexion }, config: configuracion,
   })
   const consultar = () => request(aplicacion).get('/api/obligaciones/81/historial').auth(token, { type: 'bearer' })
-  return { aplicacion, consultar, ejecutar, conexion, abonos }
+  return { aplicacion, consultar, ejecutar, conexion, abonos, pool: { getConnection: async () => conexion } }
 }
 
 test('historial ruta: conserva autenticación, rol, validación y obligación inexistente', async () => {
@@ -95,8 +96,7 @@ test('historial ruta: un abono nuevo aparece primero y conserva todos los pagos 
   assert.equal(antes.total_abonado, '70.00')
   assert.equal(antes.saldo_pendiente_calculado, '30.00')
 
-  const registro = await request(escenario.aplicacion).post('/api/obligaciones/81/abonos').auth(token, { type: 'bearer' })
-    .send({ monto: '30.00', medio_pago: 'Billetera digital', clave_idempotencia: 'nuevo-abono-historial-0001' }).expect(201)
+  const registro = { body: await registrarAbono(escenario.pool, 81, { monto: '30.00', medio_pago: 'Billetera digital', clave_idempotencia: 'nuevo-abono-historial-0001' }, 42) }
   assert.equal(registro.body.abono.id, 13)
   assert.equal(escenario.conexion.commit.mock.callCount(), 1)
   assert.equal(escenario.conexion.rollback.mock.callCount(), 0)

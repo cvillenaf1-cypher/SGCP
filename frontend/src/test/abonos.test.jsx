@@ -9,7 +9,7 @@ const pendiente = { ...obligacion, id: 83, concepto: 'Préstamo pendiente', sald
 const pagada = { ...obligacion, id: 82, concepto: 'Alquiler pagado', saldo_pendiente: '0.00', estado_economico: 'PAGADO', vencida: false }
 const valores = { montoAbono: '100.50', medioPago: 'Efectivo' }
 
-beforeEach(() => vi.stubGlobal('crypto', { randomUUID: vi.fn().mockReturnValue('123e4567-e89b-12d3-a456-426614174000') }))
+beforeEach(() => { vi.stubGlobal('crypto', { randomUUID: vi.fn().mockReturnValue('123e4567-e89b-12d3-a456-426614174000') }); vi.stubGlobal('URL', class extends URL { static createObjectURL = vi.fn(() => 'blob:recibo'); static revokeObjectURL = vi.fn() }) })
 afterEach(() => vi.unstubAllGlobals())
 
 function prepararFormulario(solicitar = vi.fn().mockImplementation((ruta) => Promise.resolve(ruta === '/api/obligaciones' ? { obligaciones: [pendiente, obligacion, pagada] } : { obligacion }))) {
@@ -21,6 +21,7 @@ async function seleccionarObligacion() {
   await screen.findByRole('option', { name: /Servicio/ })
   fireEvent.change(screen.getByLabelText('Pago pendiente'), { target: { value: '81' } })
   await screen.findByLabelText('Monto del abono (S/)')
+  fireEvent.change(screen.getByLabelText('Comprobante o factura (obligatorio)'), { target: { files: [new File(['imagen'], 'recibo.png', { type: 'image/png' })] } })
 }
 
 describe('Validación de abonos — HU-03', () => {
@@ -104,7 +105,7 @@ describe('Formulario de registro de pagos realizados', () => {
       .mockResolvedValueOnce({ obligacion })
       .mockResolvedValueOnce({
         message: 'Abono registrado correctamente.',
-        abono: { obligacion_id: 81, saldo_resultante: '25.00' },
+        comprobante: { abono_id: 18, nombre: 'recibo.png' }, abono: { id: 18, obligacion_id: 81, saldo_resultante: '25.00' },
       })
       .mockResolvedValueOnce({ obligacion: saldoActualizado })
     prepararFormulario(solicitar)
@@ -113,16 +114,16 @@ describe('Formulario de registro de pagos realizados', () => {
     fireEvent.change(screen.getByLabelText('Medio de pago'), { target: { value: 'Efectivo' } })
     fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
     await waitFor(() => expect(solicitar.mock.calls.some(([ruta, opciones]) => ruta.endsWith('/abonos') && opciones.method === 'POST')).toBe(true))
-    await waitFor(() => expect(document.querySelector('.notice')).toHaveTextContent('Abono registrado correctamente.'))
+    await waitFor(() => expect(screen.getByText('Abono registrado correctamente.')).toHaveTextContent('Abono registrado correctamente.'))
     await waitFor(() => expect(screen.getByText('S/ 25.00')).toBeInTheDocument())
     expect(screen.getByText('PARCIAL')).toBeInTheDocument()
     const envio = solicitar.mock.calls.find(([ruta, opciones]) => ruta === '/api/obligaciones/81/abonos' && opciones.method === 'POST')
-    expect(envio[1].body).toEqual({
+    expect(Object.fromEntries([...envio[1].body].filter(([campo]) => campo !== 'comprobante'))).toEqual({
       monto: '100.50',
       medio_pago: 'Efectivo',
       clave_idempotencia: expect.any(String),
     })
-    expect(envio[1].body.clave_idempotencia).toHaveLength(36)
+    expect(envio[1].body.get('clave_idempotencia')).toHaveLength(36)
     expect(solicitar.mock.calls.filter(([ruta]) => ruta === '/api/obligaciones/81')).toHaveLength(2)
   })
 
@@ -132,7 +133,7 @@ describe('Formulario de registro de pagos realizados', () => {
     const solicitar = vi.fn()
       .mockResolvedValueOnce({ obligaciones: [saldoInicial] })
       .mockResolvedValueOnce({ obligacion: saldoInicial })
-      .mockResolvedValueOnce({ message: 'Abono registrado correctamente.', abono: { obligacion_id: 81, saldo_resultante: '0.00' } })
+      .mockResolvedValueOnce({ message: 'Abono registrado correctamente.', comprobante: { abono_id: 18, nombre: 'recibo.png' }, abono: { id: 18, obligacion_id: 81, saldo_resultante: '0.00' } })
       .mockResolvedValueOnce({ obligacion: saldoFinal })
     prepararFormulario(solicitar)
     await seleccionarObligacion()
@@ -150,7 +151,7 @@ describe('Formulario de registro de pagos realizados', () => {
     prepararFormulario(vi.fn()
       .mockResolvedValueOnce({ obligaciones: [obligacion] })
       .mockResolvedValueOnce({ obligacion })
-      .mockResolvedValueOnce({ message: 'Abono registrado correctamente.', abono: { obligacion_id: 81, saldo_resultante: '0.00' } })
+      .mockResolvedValueOnce({ message: 'Abono registrado correctamente.', comprobante: { abono_id: 18, nombre: 'recibo.png' }, abono: { id: 18, obligacion_id: 81, saldo_resultante: '0.00' } })
       .mockRejectedValueOnce(new Error('Sin conexión al consultar saldo.')))
     await seleccionarObligacion()
     fireEvent.change(screen.getByLabelText('Monto del abono (S/)'), { target: { value: '125.50' } })
@@ -175,7 +176,7 @@ describe('Formulario de registro de pagos realizados', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Registrar abono' }))
     fireEvent.click(screen.getByRole('button', { name: 'Registrando abono…' }))
     expect(solicitar.mock.calls.filter(([ruta, opciones]) => ruta.endsWith('/abonos') && opciones.method === 'POST')).toHaveLength(1)
-    await act(async () => resolverEnvio({ message: 'Abono registrado correctamente.', abono: { obligacion_id: 81, saldo_resultante: '25.00' } }))
+    await act(async () => resolverEnvio({ message: 'Abono registrado correctamente.', comprobante: { abono_id: 18, nombre: 'recibo.png' }, abono: { id: 18, obligacion_id: 81, saldo_resultante: '25.00' } }))
     expect(await screen.findByText('Abono registrado correctamente.')).toBeInTheDocument()
   })
 
@@ -185,7 +186,7 @@ describe('Formulario de registro de pagos realizados', () => {
       .mockResolvedValueOnce({ obligaciones: [obligacion] })
       .mockResolvedValueOnce({ obligacion })
       .mockRejectedValueOnce(falloRed)
-      .mockResolvedValueOnce({ message: 'Abono registrado correctamente.', abono: { obligacion_id: 81, saldo_resultante: '25.00' } })
+      .mockResolvedValueOnce({ message: 'Abono registrado correctamente.', comprobante: { abono_id: 18, nombre: 'recibo.png' }, abono: { id: 18, obligacion_id: 81, saldo_resultante: '25.00' } })
       .mockResolvedValueOnce({ obligacion: { ...obligacion, saldo_pendiente: '25.00', estado_economico: 'PARCIAL' } })
     prepararFormulario(solicitar)
     await seleccionarObligacion()
@@ -197,7 +198,7 @@ describe('Formulario de registro de pagos realizados', () => {
     const primerEnvio = solicitar.mock.calls.find(([ruta, opciones]) => ruta.endsWith('/abonos') && opciones.method === 'POST')[1].body
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar registro' }))
     await waitFor(() => expect(solicitar.mock.calls.filter(([ruta, opciones]) => ruta.endsWith('/abonos') && opciones.method === 'POST')).toHaveLength(2))
-    await waitFor(() => expect(document.querySelector('.notice')).toHaveTextContent('Abono registrado correctamente.'))
+    await waitFor(() => expect(screen.getByText('Abono registrado correctamente.')).toHaveTextContent('Abono registrado correctamente.'))
     const envios = solicitar.mock.calls.filter(([ruta, opciones]) => ruta.endsWith('/abonos') && opciones.method === 'POST')
     expect(envios).toHaveLength(2)
     expect(envios[1][1].body).toEqual(primerEnvio)
