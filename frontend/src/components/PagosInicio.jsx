@@ -207,7 +207,7 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, a
         onChange={(evento) => establecerMesElegido({ periodo: periodoActual, mes: evento.target.value })}>
         {meses.map((nombre, indice) => <option key={nombre} value={String(indice + 1).padStart(2, '0')}>{nombre}</option>)}
       </select><h3 id="titulo-pagos-inicio">Pagos del mes</h3>
-        <p>Consulta las obligaciones del mes seleccionado y abre sus detalles para ver los abonos.</p></div>
+        <p>Consulta las obligaciones del mes. En el mes actual también aparecen las deudas vencidas pendientes.</p></div>
       <button ref={botonActualizar} type="button" className="secondary-button" disabled={consulta.cargando || bloqueada} onClick={actualizarListado}>Actualizar listado</button>
     </div>
     {consulta.cargando && <p role="status">{consulta.obligaciones.length ? 'Actualizando pagos del mes…' : 'Cargando pagos del mes…'}</p>}

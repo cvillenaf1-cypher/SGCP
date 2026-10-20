@@ -41,7 +41,7 @@ function preparar({ obligaciones = datos, abonosIniciales = [], puedeRegistrar =
       }
     }
     if (ruta.endsWith('/abonos') && opciones.method === 'POST') {
-      const resultado = registrar ? await registrar(opciones.body) : { abono: { id: 50, obligacion_id: fila.id, saldo_resultante: (Number(fila.saldo_pendiente) - Number(opciones.body.monto)).toFixed(2) } }
+      const resultado = registrar ? await registrar(opciones.body) : { abono: { id: 50 + abonos.length, obligacion_id: fila.id, saldo_resultante: (Number(fila.saldo_pendiente) - Number(opciones.body.monto)).toFixed(2) } }
       fila.saldo_pendiente = resultado.abono.saldo_resultante
       abonos.push({ ...resultado.abono, monto: opciones.body.monto, medio_pago: opciones.body.medio_pago, fecha_registro: '2026-10-20T16:00:00Z', tiene_comprobante: false })
       return resultado
@@ -78,12 +78,15 @@ async function completar(monto = '25.00') {
 }
 
 describe('Período y prioridad del inicio', () => {
-  it('incluye solo el mes seleccionado del año actual, con cualquier estado, sin modificar los datos', () => {
+  it('incluye el mes seleccionado y arrastra las vencidas con saldo solo al mes actual, sin modificar los datos', () => {
     const originales = structuredClone(datos)
-    expect(seleccionarPagosInicio(datos, '2026-10-20').map((fila) => fila.id)).toEqual([7, 1, 2, 3])
+    expect(seleccionarPagosInicio(datos, '2026-10-20').map((fila) => fila.id)).toEqual([4, 7, 1, 2, 3])
     expect(seleccionarPagosInicio(datos, '2026-10-20', '09').map((fila) => fila.id)).toEqual([4, 5])
     expect(seleccionarPagosInicio(datos, '2026-10-20', '11').map((fila) => fila.id)).toEqual([6])
-    expect(seleccionarPagosInicio([...datos, { ...obligacion, id: 8, fecha_limite: '2025-10-25' }], '2026-10-20').map((fila) => fila.id)).toEqual([7, 1, 2, 3])
+    expect(seleccionarPagosInicio([...datos,
+      { ...obligacion, id: 8, fecha_limite: '2025-10-25' },
+      { ...obligacion, id: 9, fecha_limite: '2025-09-30', saldo_pendiente: '0.00' },
+    ], '2026-10-20').map((fila) => fila.id)).toEqual([8, 4, 7, 1, 2, 3])
     expect(datos).toEqual(originales)
   })
 
@@ -105,8 +108,8 @@ describe('Consulta inicial compartida y detalles', () => {
     const { solicitar } = preparar()
     const tabla = await screen.findByRole('table')
     expect(solicitar.mock.calls[0][0]).toBe('/api/obligaciones')
-    expect(within(tabla).getAllByRole('row')).toHaveLength(5)
-    for (const nombre of ['Servicio de internet', 'Abono del mes', 'Pagada del mes', 'Vencida del mes']) expect(within(tabla).getByText(nombre)).toBeInTheDocument()
+    expect(within(tabla).getAllByRole('row')).toHaveLength(6)
+    for (const nombre of ['Servicio de internet', 'Abono del mes', 'Pagada del mes', 'Vencida del mes', 'Deuda antigua']) expect(within(tabla).getByText(nombre)).toBeInTheDocument()
     expect(screen.queryByText('Deuda futura')).not.toBeInTheDocument()
     expect(screen.queryByText('Pagada antigua')).not.toBeInTheDocument()
     const filtro = screen.getByRole('combobox', { name: 'Mes de los pagos' })
@@ -182,10 +185,10 @@ describe('Consulta inicial compartida y detalles', () => {
     expect(screen.getByText('No hay obligaciones para el mes seleccionado.')).toBeInTheDocument()
   })
 
-  it('el temporizador cambia automáticamente a enero del nuevo año sin mezclar registros del año anterior', async () => {
+  it('el temporizador cambia a enero del nuevo año conservando las vencidas y excluyendo las antiguas pagadas', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
     preparar({ obligaciones: [...datos,
-      { ...obligacion, id: 8, concepto: 'Enero anterior', fecha_limite: '2026-01-01' },
+      { ...obligacion, id: 8, concepto: 'Enero anterior', fecha_limite: '2026-01-01', saldo_pendiente: '0.00' },
       { ...obligacion, id: 9, concepto: 'Enero nuevo', fecha_limite: '2027-01-31' },
     ] })
     await screen.findByRole('table')
@@ -196,6 +199,7 @@ describe('Consulta inicial compartida y detalles', () => {
     })
     expect(await screen.findByText('Enero nuevo')).toBeInTheDocument()
     expect(screen.queryByText('Enero anterior')).not.toBeInTheDocument()
+    expect(screen.getByText('Deuda antigua')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Mes de los pagos' })).toHaveValue('01')
   })
 
@@ -258,6 +262,27 @@ describe('Registro directo y comprobantes', () => {
     expect(fila).toHaveTextContent('Pagado')
     expect(fila).toHaveTextContent('S/ 0.00')
     expect(screen.queryByLabelText('Monto del abono (S/)')).not.toBeInTheDocument()
+  })
+
+  it('mantiene una vencida de septiembre en octubre mientras hay saldo y la conserva solo en septiembre al cancelarla', async () => {
+    preparar({ obligaciones: [datos[3]] })
+    fireEvent.click(await screen.findByRole('button', { name: /Ver detalles.*\(#4\)/ }))
+    const panel = screen.getByRole('dialog', { name: 'Detalle de la obligación #4' })
+    await within(panel).findByText('Beneficiario')
+    await completar('5.00')
+    fireEvent.click(within(panel).getByRole('button', { name: 'Registrar abono' }))
+    await waitFor(() => expect(screen.getByRole('table')).toHaveTextContent('S/ 15.00'))
+    expect(screen.getByRole('combobox', { name: 'Mes de los pagos' })).toHaveValue('10')
+    await completar('15.00')
+    fireEvent.click(within(panel).getByRole('button', { name: 'Registrar abono' }))
+    await waitFor(() => expect(screen.queryByRole('table')).not.toBeInTheDocument())
+    expect(await within(panel).findByText(/Esta obligación ya está pagada/)).toBeInTheDocument()
+    await waitFor(() => expect(within(panel).getByRole('list', { name: 'Historial de abonos' }).children).toHaveLength(2))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Cerrar detalles' }))
+    expect(screen.getByRole('button', { name: 'Actualizar listado' })).toHaveFocus()
+    fireEvent.change(screen.getByRole('combobox', { name: 'Mes de los pagos' }), { target: { value: '09' } })
+    expect(screen.getByRole('table')).toHaveTextContent('Deuda antigua')
+    expect(screen.getByRole('table')).toHaveTextContent('Pagado')
   })
 
   it('conserva la deuda de un mes anterior al cancelarla, con su confirmación e historial', async () => {

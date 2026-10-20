@@ -1,6 +1,7 @@
 # Inicio compartido: pagos del mes y registro directo
 
-El gerente y el asistente ven automáticamente los compromisos del mes actual.
+El gerente y el asistente ven automáticamente los compromisos del mes actual y
+las deudas vencidas de meses anteriores que todavía tienen saldo pendiente.
 Sobre el título **Pagos del mes**, un selector permite elegir entre enero y
 diciembre, sin selector de año. Se usa el año actual del calendario de
 `America/Lima` y la fecha de vencimiento de cada obligación.
@@ -8,7 +9,12 @@ diciembre, sin selector de año. Se usa el año actual del calendario de
 ## Comportamiento
 
 - Incluye todas las obligaciones del mes seleccionado, incluso las pagadas.
-- Permite consultar meses anteriores o futuros del año actual, sin mezclar períodos.
+- En el mes actual incluye además las vencidas con saldo de períodos anteriores,
+  incluso de años anteriores. Conservan su fecha de vencimiento original.
+- Una deuda vencida de septiembre aparece en septiembre y en el mes actual de
+  octubre. Un abono parcial mantiene ambas apariciones; al cancelarla deja de
+  arrastrarse a octubre y se conserva como pagada en septiembre.
+- Los meses seleccionados que no sean el actual muestran solo sus obligaciones.
 - Elegir un mes actualiza la tabla inmediatamente, sin pulsar Actualizar listado.
 - Ordena vencidas, pendientes/parciales del mes y pagadas; desempata por fecha e ID.
 - Muestra concepto, beneficiario, importe original, saldo, vencimiento y estado.
@@ -47,8 +53,9 @@ bloqueo de fila para impedir excesos cuando hay registros simultáneos.
 Una obligación ya pagada permite consultar su historial, sin ofrecer otro pago.
 
 Después del abono se actualizan el saldo, el estado, el listado y el historial.
-El panel permanece abierto al cancelar una deuda, y la fila continúa visible como
-pagada dentro del mes elegido.
+El panel permanece abierto al cancelar una deuda. La fila sigue visible como
+pagada en su mes original; si estaba arrastrada al mes actual, sale de ese listado
+sin perder la confirmación ni el historial del detalle abierto.
 El registro monetario y el archivo mantienen confirmaciones independientes:
 un error de comprobante no deshace ni repite el abono.
 
