@@ -53,6 +53,7 @@ El formulario indica el saldo máximo a abonar y rechaza un importe superior,
 incluido un exceso de un céntimo. El backend vuelve a verificar el saldo bajo
 bloqueo de fila para impedir excesos cuando hay registros simultáneos.
 Una obligación ya pagada permite consultar su historial, sin ofrecer otro pago.
+El botón **Actualizar historial** solo aparece mientras queda saldo pendiente y se oculta al completar el pago. Los abonos y comprobantes siguen disponibles; si falla la consulta del historial, se conserva la opción de reintentar incluso en una obligación pagada.
 
 Después del abono se actualizan el saldo, el estado, el listado y el historial.
 El panel permanece abierto al cancelar una deuda. La fila sigue visible como

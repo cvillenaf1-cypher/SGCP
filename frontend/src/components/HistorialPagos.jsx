@@ -120,7 +120,7 @@ export function PresentacionHistorial({ historial }) {
   </>
 }
 
-export function ConsultaHistorialObligacion({ identificador, actualizacion = 0 }) {
+export function ConsultaHistorialObligacion({ identificador, saldoPendiente, actualizacion = 0 }) {
   const { solicitar } = useAutenticacion()
   const [estado, establecerEstado] = useState({ cargando: true, historial: null, error: '' })
   const [intento, establecerIntento] = useState(0)
@@ -142,8 +142,11 @@ export function ConsultaHistorialObligacion({ identificador, actualizacion = 0 }
     establecerIntento((actual) => actual + 1)
   }
 
+  const estaPagada = convertirACentimos(saldoPendiente) === 0n
+    || convertirACentimos(estado.historial?.saldo_pendiente) === 0n
+
   return <section className="historial-detalle" aria-label="Historial de la obligación" aria-busy={estado.cargando}>
-    <button type="button" className="secondary-button" disabled={estado.cargando} onClick={actualizarHistorial}>Actualizar historial</button>
+    {!estaPagada && <button type="button" className="secondary-button" disabled={estado.cargando} onClick={actualizarHistorial}>Actualizar historial</button>}
     {estado.cargando && <p role="status">{estado.historial ? 'Actualizando historial…' : 'Cargando historial…'}</p>}
     {estado.error && <>
       <p className="error-message" role="alert">{estado.error}</p>
@@ -248,7 +251,7 @@ export function HistorialPagos() {
             </table>
           </div>}
       {seleccionFueraDeFiltros && <p className="description">El historial de <strong>{obligacionSeleccionada.concepto}</strong> sigue abierto debajo. Esta obligación no coincide con los filtros actuales.</p>}
-      {seleccionado && <ConsultaHistorialObligacion key={seleccionado} identificador={seleccionado} />}
+      {seleccionado && <ConsultaHistorialObligacion key={seleccionado} identificador={seleccionado} saldoPendiente={obligacionSeleccionada?.saldo_pendiente} />}
     </>}
   </section>
 }

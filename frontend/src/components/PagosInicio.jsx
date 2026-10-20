@@ -130,7 +130,7 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
         <div><dt>Estado del pago</dt><dd><EstadoPago obligacion={obligacion} /></dd></div>
       </dl>
       <h4 className="inicio-titulo-historial">Pagos y comprobantes</h4>
-      <ConsultaHistorialObligacion identificador={identificador} actualizacion={versionHistorial} />
+      <ConsultaHistorialObligacion identificador={identificador} saldoPendiente={obligacion.saldo_pendiente} actualizacion={versionHistorial} />
       {obligacion.estado_economico === 'PAGADO' && !mostrarRegistro && <p className="notice">Esta obligación ya está pagada. Puedes consultar sus pagos y comprobantes.</p>}
     </>}
   </dialog>

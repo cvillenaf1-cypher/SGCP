@@ -143,6 +143,7 @@ describe('Consulta inicial compartida y detalles', () => {
     expect(within(panel).getByText(/Esta obligación ya está pagada/)).toBeInTheDocument()
     expect(within(panel).queryByLabelText('Monto del abono (S/)')).not.toBeInTheDocument()
     expect(within(panel).queryByRole('button', { name: 'Registrar pago', exact: true })).not.toBeInTheDocument()
+    expect(within(panel).queryByRole('button', { name: 'Actualizar historial' })).not.toBeInTheDocument()
   })
 
   it('GERENTE ve los mismos compromisos y detalles sin controles de escritura', async () => {
@@ -234,6 +235,7 @@ describe('Registro directo y comprobantes', () => {
     const { solicitar } = preparar({ obligaciones: [datos[1]], abonosIniciales: [anterior] })
     const panel = await abrir(2)
     expect(await within(panel).findByRole('list', { name: 'Historial de abonos' })).toHaveTextContent('S/ 70.00')
+    expect(within(panel).getByRole('button', { name: 'Actualizar historial' })).toBeEnabled()
     expect(within(panel).queryByLabelText('Monto del abono (S/)')).not.toBeInTheDocument()
     await completar('30.01')
     expect(within(panel).getByText('Máximo a abonar:', { exact: false })).toHaveTextContent('S/ 30.00')
@@ -243,6 +245,7 @@ describe('Registro directo y comprobantes', () => {
     await completar('30.00')
     fireEvent.click(within(panel).getByRole('button', { name: 'Registrar abono' }))
     expect(await within(panel).findByText(/Esta obligación ya está pagada/)).toBeInTheDocument()
+    expect(within(panel).queryByRole('button', { name: 'Actualizar historial' })).not.toBeInTheDocument()
     await waitFor(() => expect(within(panel).getByRole('list', { name: 'Historial de abonos' }).children).toHaveLength(2))
     expect(within(panel).queryByLabelText('Monto del abono (S/)')).not.toBeInTheDocument()
     expect(solicitar.mock.calls.filter(([, opciones]) => opciones?.method === 'POST')).toHaveLength(1)
