@@ -7,13 +7,13 @@ import { DatosObligacionAbono } from './FormularioAbono'
 import { ConsultaHistorialObligacion } from './HistorialPagos'
 import './PagosInicio.css'
 
-const etiquetasEstado = { PENDIENTE: 'Pendiente · sin abonos', PARCIAL: 'Parcial · con saldo', PAGADO: 'Pagado' }
+const etiquetasEstado = { PENDIENTE: 'Pendiente', PARCIAL: 'Parcial', PAGADO: 'Pagado' }
 const noBloquear = () => {}
 
 function EstadoPago({ obligacion }) {
   return <span className="inicio-estados">
     <span className={`inicio-estado inicio-estado--${obligacion.estado_economico.toLowerCase()}`}>{etiquetasEstado[obligacion.estado_economico]}</span>
-    {obligacion.vencida && <span className="inicio-estado inicio-estado--vencida">Vencida · pendiente de cancelar</span>}
+    {obligacion.vencida && <span className="inicio-estado inicio-estado--vencida">Vencida</span>}
   </span>
 }
 
@@ -26,6 +26,7 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
   const [mostrarRegistro, establecerMostrarRegistro] = useState(false)
   const dialogo = useRef(null)
   const titulo = useRef(null)
+  const tituloRegistro = useRef(null)
 
   useEffect(() => {
     const ventana = dialogo.current
@@ -38,6 +39,10 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
       document.body.style.overflow = desbordamientoAnterior
     }
   }, [])
+
+  useEffect(() => {
+    if (mostrarRegistro) tituloRegistro.current?.focus()
+  }, [mostrarRegistro])
 
   useEffect(() => {
     const controlador = new AbortController()
@@ -95,7 +100,11 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
     }}>
     <div className="inicio-detalle-encabezado">
       <h3 ref={titulo} tabIndex={-1} id="titulo-detalle-inicio">Detalle de la obligación #{identificador}</h3>
-      <button type="button" className="secondary-button" disabled={bloqueada} onClick={cerrar}>Cerrar detalles</button>
+      <div className="inicio-detalle-acciones">
+        {puedeRegistrar && obligacion && convertirACentimos(obligacion.saldo_pendiente) > 0n && !mostrarRegistro &&
+          <button type="button" className="inicio-boton-registrar" disabled={bloqueada} onClick={() => establecerMostrarRegistro(true)}>Registrar pago</button>}
+        <button type="button" className="secondary-button" disabled={bloqueada} onClick={cerrar}>Cerrar detalles</button>
+      </div>
     </div>
     {bloqueada && <p className="notice" role="status">Hay un registro o una confirmación pendiente. Resuélvelo antes de cerrar el detalle.</p>}
     {consulta.cargando && <p role="status">Cargando detalle…</p>}
@@ -104,6 +113,12 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
       <button type="button" onClick={() => { establecerConsulta((actual) => ({ ...actual, cargando: true, error: '' })); establecerIntento((actual) => actual + 1) }}>Reintentar detalle</button>
     </>}
     {obligacion && <>
+      {puedeRegistrar && mostrarRegistro && <section className="inicio-registro" aria-labelledby="titulo-pago-directo">
+        <h4 ref={tituloRegistro} tabIndex={-1} id="titulo-pago-directo">Registrar pago realizado</h4>
+        {convertirACentimos(obligacion.saldo_pendiente) > 0n && <p>Puedes abonar una parte o cancelar el saldo restante. El importe no puede superar {formatearImporte(obligacion.saldo_pendiente)}.</p>}
+        <DatosObligacionAbono identificador={identificador} alBloquear={bloquear} alActualizarObligacion={actualizarObligacion}
+          alRegistrar={actualizarTrasRegistro} mostrarResumen={false} />
+      </section>}
       <dl className="inicio-resumen">
         <div><dt>Concepto</dt><dd>{obligacion.concepto}</dd></div>
         <div><dt>Beneficiario</dt><dd>{obligacion.beneficiario}</dd></div>
@@ -115,18 +130,11 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
       <h4 className="inicio-titulo-historial">Pagos y comprobantes</h4>
       <ConsultaHistorialObligacion identificador={identificador} actualizacion={versionHistorial} />
       {obligacion.estado_economico === 'PAGADO' && !mostrarRegistro && <p className="notice">Esta obligación ya está pagada. Puedes consultar sus pagos y comprobantes.</p>}
-      {puedeRegistrar && (convertirACentimos(obligacion.saldo_pendiente) > 0n || mostrarRegistro) && <section className="inicio-registro" aria-labelledby="titulo-pago-directo">
-        <h4 id="titulo-pago-directo">Registrar pago realizado</h4>
-        {convertirACentimos(obligacion.saldo_pendiente) > 0n && <p>Puedes abonar una parte o cancelar el saldo restante. El importe no puede superar {formatearImporte(obligacion.saldo_pendiente)}.</p>}
-        {mostrarRegistro ? <DatosObligacionAbono identificador={identificador} alBloquear={bloquear} alActualizarObligacion={actualizarObligacion}
-          alRegistrar={actualizarTrasRegistro} mostrarResumen={false} />
-          : <button type="button" onClick={() => establecerMostrarRegistro(true)}>Registrar pago</button>}
-      </section>}
     </>}
   </dialog>
 }
 
-export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear }) {
+export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, alNuevaDeuda }) {
   const { solicitar } = useAutenticacion()
   const [consulta, establecerConsulta] = useState({ cargando: true, obligaciones: [], error: '' })
   const [intento, establecerIntento] = useState(0)
@@ -185,6 +193,12 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear })
   const obligaciones = seleccionarPagosInicio(consulta.obligaciones, hoy)
   const periodo = new Intl.DateTimeFormat('es-PE', { timeZone: 'America/Lima', month: 'long', year: 'numeric' })
     .format(new Date(`${hoy}T12:00:00-05:00`))
+  const botonNuevaDeuda = puedeRegistrar && alNuevaDeuda && <button type="button" className="inicio-nueva-deuda"
+    aria-label="Agregar nueva deuda" title="Registrar pago pendiente" disabled={bloqueada} onClick={alNuevaDeuda}>
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  </button>
   return <section className="pagos-inicio" aria-labelledby="titulo-pagos-inicio">
     <div className="inicio-encabezado">
       <div><p className="inicio-periodo">{periodo}</p><h3 id="titulo-pagos-inicio">Pagos del mes</h3>
@@ -194,10 +208,11 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear })
     {consulta.cargando && <p role="status">{consulta.obligaciones.length ? 'Actualizando pagos del mes…' : 'Cargando pagos del mes…'}</p>}
     {consulta.error && <><p className="error-message" role="alert">{consulta.error}</p>
       <button type="button" disabled={bloqueada} onClick={actualizarListado}>Reintentar consulta</button></>}
+    {obligaciones.length === 0 && botonNuevaDeuda && <div className="inicio-tabla-herramientas">{botonNuevaDeuda}</div>}
     {!consulta.cargando && !consulta.error && obligaciones.length === 0 && <p className="empty-state" role="status">No hay obligaciones del mes ni deudas vencidas pendientes.</p>}
     {obligaciones.length > 0 && <div className="inicio-tabla-contenedor" role="region" aria-label="Obligaciones del mes y vencidas" tabIndex={0}>
       <table className="inicio-tabla" role="table">
-        <caption>{obligaciones.length} obligación(es). Pulsa Ver detalles para consultar los datos y abonos del pago.</caption>
+        <caption><div className="inicio-tabla-cabecera"><span>{obligaciones.length} obligación(es). Pulsa Ver detalles para consultar los datos y abonos del pago.</span>{botonNuevaDeuda}</div></caption>
         <thead role="rowgroup"><tr role="row">{['Concepto', 'Beneficiario', 'Monto original', 'Saldo pendiente', 'Vencimiento', 'Estado del pago', 'Acciones'].map((texto) => <th role="columnheader" key={texto} scope="col">{texto}</th>)}</tr></thead>
         <tbody role="rowgroup">{obligaciones.map((obligacion) => <tr role="row" key={obligacion.id} className={seleccionado === obligacion.id ? 'inicio-fila--seleccionada' : ''}
           onClick={(evento) => seleccionar(obligacion, evento.currentTarget.querySelector('button'))}>
