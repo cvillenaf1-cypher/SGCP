@@ -1,8 +1,17 @@
+.resumen-mensual {
+  margin: 24px 0 32px;
+}
+
+.resumen-mensual h3 {
+  margin: 0 0 18px;
+  color: #041e38;
+  font-size: clamp(1.35rem, 2.3vw, 1.75rem);
+}
+
 .indicadores-resumen {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-  padding: 0 28px 28px;
 }
 
 .tarjeta-indicador {
@@ -41,14 +50,22 @@
 }
 
 @media (max-width: 640px) {
-  .indicadores-resumen { grid-template-columns: 1fr; padding: 0 20px 20px; }
+  .indicadores-resumen { grid-template-columns: 1fr; }
 }
 
-.mensaje-resumen-vacio {
-  margin: 12px 0 0;
-  padding: 0 0 16px 30px;
-  font-size: 0.875rem;
+.tarjeta-indicador--vencido {
+  border-color: #efc8c8;
+  border-top-color: #9b2020;
+  background: #fff1f1;
+}
+
+.tarjeta-indicador--vencido h4,
+.tarjeta-indicador--vencido .importe-resumen,
+.tarjeta-indicador--vencido .cantidad-vencidas {
+  color: #9b2020;
+}
+
+.tarjeta-indicador .cantidad-vencidas {
+  margin-top: 12px;
   font-weight: 700;
-  color: #234b91;
-  text-align: left;
 }

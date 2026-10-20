@@ -5,6 +5,7 @@ import { convertirACentimos } from '../lib/validarAbono'
 import { actualizarEstadoObligacion, esObligacionValida, fechaActualLima, formatearFechaObligacion, seleccionarPagosInicio } from '../lib/pagosInicio'
 import { DatosObligacionAbono } from './FormularioAbono'
 import { ConsultaHistorialObligacion } from './HistorialPagos'
+import { ResumenMensualIntegrado } from '../gerente/ResumenMensualIntegrado'
 import './PagosInicio.css'
 
 const etiquetasEstado = { PENDIENTE: 'Pendiente', PARCIAL: 'Parcial', PAGADO: 'Pagado' }
@@ -135,7 +136,7 @@ function DetalleObligacion({ identificador, puedeRegistrar, alActualizar, alRegi
   </dialog>
 }
 
-export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, alNuevaDeuda }) {
+export function PagosInicio({ puedeRegistrar = false, mostrarResumen = false, alBloquear = noBloquear, alNuevaDeuda }) {
   const { solicitar } = useAutenticacion()
   const [consulta, establecerConsulta] = useState({ cargando: true, obligaciones: [], error: '' })
   const [intento, establecerIntento] = useState(0)
@@ -155,14 +156,18 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, a
 
   useEffect(() => {
     const controlador = new AbortController()
-    solicitar('/api/obligaciones', { signal: controlador.signal })
-      .then((datos) => {
+    async function cargarListado() {
+      if (controlador.signal.aborted) return
+      try {
+        const datos = await solicitar('/api/obligaciones', { signal: controlador.signal })
         if (!Array.isArray(datos?.obligaciones) || !datos.obligaciones.every(esObligacionValida)) throw new Error('El servidor no devolvió un listado válido de obligaciones.')
         if (!controlador.signal.aborted) establecerConsulta({ cargando: false, obligaciones: datos.obligaciones, error: '' })
-      })
-      .catch((error) => {
+      } catch (error) {
         if (!controlador.signal.aborted) establecerConsulta((actual) => ({ ...actual, cargando: false, error: error.message }))
-      })
+      }
+    }
+    // Cancela el montaje de comprobación de React antes de enviar la lectura compartida.
+    Promise.resolve().then(cargarListado)
     return () => controlador.abort()
   }, [solicitar, intento, hoy])
 
@@ -200,6 +205,14 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, a
   const periodoActual = hoy.slice(0, 7)
   const mes = mesElegido?.periodo === periodoActual ? mesElegido.mes : hoy.slice(5, 7)
   const obligaciones = seleccionarPagosInicio(consulta.obligaciones, hoy, mes)
+  const resumenVisible = mostrarResumen && !puedeRegistrar
+  const controlesPeriodo = <div className="inicio-periodo-controles">
+    <select className="inicio-periodo" aria-label="Mes de los pagos" value={mes} disabled={bloqueada}
+      onChange={(evento) => establecerMesElegido({ periodo: periodoActual, mes: evento.target.value })}>
+      {meses.map((nombre, indice) => <option key={nombre} value={String(indice + 1).padStart(2, '0')}>{nombre}</option>)}
+    </select>
+    <button type="button" className="secondary-button" disabled={bloqueada} onClick={volverAlMesActual}>Volver al mes actual</button>
+  </div>
   const botonNuevaDeuda = puedeRegistrar && alNuevaDeuda && <button type="button" className="inicio-nueva-deuda"
     aria-label="Agregar nueva deuda" title="Registrar pago pendiente" disabled={bloqueada} onClick={alNuevaDeuda}>
     <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -207,13 +220,12 @@ export function PagosInicio({ puedeRegistrar = false, alBloquear = noBloquear, a
     </svg>
   </button>
   return <section className="pagos-inicio" aria-labelledby="titulo-pagos-inicio">
+    {resumenVisible && <>
+      {controlesPeriodo}
+      <ResumenMensualIntegrado obligaciones={consulta.obligaciones} mes={mes} hoy={hoy} cargando={consulta.cargando} error={consulta.error} />
+    </>}
     <div className="inicio-encabezado">
-      <div><div className="inicio-periodo-controles"><select className="inicio-periodo" aria-label="Mes de los pagos" value={mes} disabled={bloqueada}
-        onChange={(evento) => establecerMesElegido({ periodo: periodoActual, mes: evento.target.value })}>
-        {meses.map((nombre, indice) => <option key={nombre} value={String(indice + 1).padStart(2, '0')}>{nombre}</option>)}
-      </select>
-        <button type="button" className="secondary-button" disabled={bloqueada} onClick={volverAlMesActual}>Volver al mes actual</button>
-      </div><h3 id="titulo-pagos-inicio">Pagos del mes</h3>
+      <div>{!resumenVisible && controlesPeriodo}<h3 id="titulo-pagos-inicio">Pagos del mes</h3>
         <p>Consulta las obligaciones del mes. En el mes actual también aparecen las deudas vencidas pendientes.</p></div>
       <button ref={botonActualizar} type="button" className="secondary-button" disabled={consulta.cargando || bloqueada} onClick={actualizarListado}>Actualizar listado</button>
     </div>

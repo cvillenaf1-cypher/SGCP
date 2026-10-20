@@ -75,9 +75,13 @@ Se habilitan para GERENTE únicamente las lecturas de detalle e historial existe
 El listado general mantiene sus filtros y resultados completos. Los POST de
 obligaciones, abonos y comprobantes siguen siendo exclusivos del ASISTENTE.
 
-Se conserva la consulta mensual histórica independiente del gerente con su
-selector de período. En el inicio compartido se filtra únicamente por mes del año
-actual; el asistente consulta el historial desde los detalles de cada obligación.
+El gerente consulta HU-07 directamente en el panel: selector de mes, **Resumen
+mensual** con cuatro tarjetas y tabla **Pagos del mes**, en ese orden. Los tres
+primeros indicadores usan el mes del año actual; el vencido acumulado usa todas
+las obligaciones pendientes anteriores a hoy en Lima. Comparten datos y recargas
+con el listado, sin otra consulta ni selector. El asistente consulta el historial
+desde los detalles y no visualiza estos indicadores exclusivos del gerente.
+Ver [resumen integrado](resumen-integrado-gerente.md).
 
 No se añaden aprobaciones empresariales ni verificaciones bancarias. Un comprobante
 es evidencia adjunta al registro, no una confirmación bancaria de autenticidad.

@@ -18,7 +18,7 @@
 .inicio-encabezado p { margin: 8px 0 0; color: #43586d; }
 .inicio-periodo-controles { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
 .inicio-periodo-controles .secondary-button { min-height: 44px; padding: 8px 12px; font-size: .9rem; }
-.inicio-encabezado .inicio-periodo { display: block; max-width: 100%; min-height: 44px; padding: 8px 36px 8px 12px; border: 1px solid #bdd8cd; border-radius: 8px; color: #006b50; background: #fff; font: inherit; font-weight: 700; margin: 0; cursor: pointer; }
+.inicio-periodo { display: block; max-width: 100%; min-height: 44px; padding: 8px 36px 8px 12px; border: 1px solid #bdd8cd; border-radius: 8px; color: #006b50; background: #fff; font: inherit; font-weight: 700; margin: 0; cursor: pointer; }
 .inicio-periodo:focus-visible { outline: 3px solid #0878ba; outline-offset: 3px; }
 .inicio-tabla-contenedor { max-width: 100%; overflow-x: auto; border: 1px solid #ccd9e3; border-radius: 16px; background: #fff; }
 .inicio-tabla { width: 100%; border-collapse: collapse; font-size: 1rem; }

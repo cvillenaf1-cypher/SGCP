@@ -23,7 +23,7 @@ export function PaginaPanel({ role: rol, alBloquear }) {
       </div>
       {estado.cargando && <p role="status">Verificando acceso con el servidor…</p>}
       {estado.error && <p className="error-message" role="alert">{estado.error}</p>}
-      {esAsistente ? <FuncionesAsistente alBloquear={alBloquear} /> : <PagosInicio />}
+      {esAsistente ? <FuncionesAsistente alBloquear={alBloquear} /> : <PagosInicio mostrarResumen />}
     </section>
   )
 }
