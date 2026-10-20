@@ -167,25 +167,6 @@
   font-size: 0.9rem;
 }
 
-.insignia-lectura {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 12px;
-  border: 1px solid #c9e7dc;
-  border-radius: 100px;
-  color: #006747;
-  background: #e9f7f0;
-  font-size: 0.75rem;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.insignia-lectura .icono-gerente {
-  width: 15px;
-  height: 15px;
-}
-
 .tarjeta-periodo,
 .resultados-pagos,
 .navegacion-gerente {
@@ -305,146 +286,6 @@
   margin-bottom: 5px;
 }
 
-.cantidad-pagos {
-  padding: 5px 10px;
-  border-radius: 8px;
-  background: #f0f4f8;
-  color: #52677b;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-.contenedor-tabla-pagos {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-.tabla-pagos {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-  font-size: 0.83rem;
-}
-
-.tabla-pagos th,
-.tabla-pagos td {
-  padding: 19px 20px;
-  border-bottom: 1px solid #eaf0f5;
-  vertical-align: middle;
-}
-
-.tabla-pagos th:first-child,
-.tabla-pagos td:first-child {
-  padding-left: 28px;
-}
-
-.tabla-pagos th:last-child,
-.tabla-pagos td:last-child {
-  padding-right: 28px;
-}
-
-.tabla-pagos thead {
-  background: #f5f8fc;
-  color: #52677b;
-}
-
-.tabla-pagos thead th {
-  padding-top: 13px;
-  padding-bottom: 13px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.tabla-pagos thead th:nth-child(3),
-.tabla-pagos thead th:nth-child(4) {
-  text-align: right;
-}
-
-.tabla-pagos tbody th {
-  min-width: 160px;
-  max-width: 280px;
-  overflow-wrap: anywhere;
-  font-weight: 600;
-}
-
-.tabla-pagos td:nth-child(2) {
-  min-width: 130px;
-  max-width: 220px;
-  overflow-wrap: anywhere;
-  color: #596c7e;
-}
-
-.tabla-pagos tbody tr:hover {
-  background: #f9fcfb;
-}
-
-.tabla-pagos .monto-pago {
-  text-align: right;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.tabla-pagos .saldo-pago {
-  font-weight: 650;
-}
-
-.tabla-pagos .fecha-pago {
-  white-space: nowrap;
-  color: #52677b;
-  font-variant-numeric: tabular-nums;
-}
-
-.estado-pago {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 9px;
-  border: 1px solid #eadbb0;
-  border-radius: 7px;
-  background: #fff8e7;
-  color: #795500;
-  font-size: 0.72rem;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.estado-pago::before {
-  content: '';
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.estado-pago[data-estado='Parcial'] {
-  border-color: #cbddee;
-  background: #eef5fc;
-  color: #245b8b;
-}
-
-.estado-pago[data-estado='Pagado'] {
-  border-color: #c6e7d8;
-  background: #eaf8f0;
-  color: #006747;
-}
-
-.nota-consulta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  padding: 17px 28px;
-  color: #596c7e;
-  background: #fcfdfe;
-  font-size: 0.72rem;
-}
-
-.nota-consulta .icono-gerente {
-  width: 14px;
-  height: 14px;
-}
-
 .mensaje-consulta {
   display: flex;
   flex-direction: column;
@@ -509,11 +350,6 @@
   .indicador-carga {
     animation: none;
   }
-}
-
-.acceso-gerente {
-  color: #007653;
-  font-size: 0.85rem;
 }
 
 .navegacion-gerente {
@@ -643,82 +479,6 @@
     border-radius: 14px;
   }
 
-  .tabla-pagos,
-  .tabla-pagos tbody {
-    display: block;
-  }
-
-  .tabla-pagos caption {
-    display: block;
-    padding: 0 20px 16px;
-  }
-
-  /* Se conserva la cabecera para lectores de pantalla y cada celda muestra su etiqueta. */
-  .tabla-pagos thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-
-  .tabla-pagos tbody {
-    padding: 0 12px;
-  }
-
-  .tabla-pagos tbody tr {
-    display: block;
-    margin-bottom: 12px;
-    padding: 8px 16px;
-    border: 1px solid #e0e8f0;
-    border-radius: 12px;
-  }
-
-  .tabla-pagos tbody :is(th, td) {
-    display: grid;
-    grid-template-columns: minmax(100px, 0.9fr) minmax(0, 1.1fr);
-    gap: 12px;
-    align-items: center;
-    min-width: 0;
-    max-width: none;
-    padding: 10px 0;
-    text-align: right;
-    font-size: 0.8rem;
-  }
-
-  .tabla-pagos tbody :is(th, td)::before {
-    content: attr(data-etiqueta);
-    color: #596c7e;
-    text-align: left;
-    font-size: 0.72rem;
-    font-weight: 500;
-  }
-
-  .tabla-pagos tbody td:last-child {
-    border-bottom: 0;
-  }
-
-  .tabla-pagos tbody td:nth-child(2) {
-    min-width: 0;
-    max-width: none;
-  }
-
-  .tabla-pagos .monto-pago,
-  .tabla-pagos .fecha-pago {
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-
-  .tabla-pagos .estado-pago {
-    justify-self: end;
-  }
-
-  .nota-consulta {
-    align-items: flex-start;
-    padding: 16px 20px;
-    font-size: 0.68rem;
-  }
-
   .navegacion-gerente {
     padding: 22px;
   }
@@ -807,17 +567,6 @@
   font-size: 0.875rem;
   line-height: 1.5;
   max-width: 650px;
-}
-
-.pagos-del-mes .cantidad-pagos {
-  padding: 10px 16px;
-  border: 1px solid #b7e7d4;
-  border-radius: 999px;
-  background: #e8f7f1;
-  color: #006d4d;
-  font-size: 0.9rem;
-  font-weight: 700;
-  white-space: nowrap;
 }
 
 .pagos-del-mes .introduccion-periodo {

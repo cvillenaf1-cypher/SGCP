@@ -6,7 +6,6 @@ import { RequerirRol } from './auth/RequireRole'
 import { PaginaInicioSesion } from './pages/LoginPage'
 import { PaginaPanel } from './pages/DashboardPage'
 import { PaginaGerente } from './gerente/PaginaGerente'
-import { PaginaPagosDelMes } from './gerente/PaginaPagosDelMes'
 import { PaginaResumenMensual } from './gerente/PaginaResumenMensual'
 import './App.css'
 
@@ -128,10 +127,6 @@ function Aplicacion() {
               element={<PaginaGerente />}
             />
 
-            <Route
-              path="/gerente/pagos-del-mes"
-              element={<PaginaPagosDelMes />}
-            />
             <Route
               path="/gerente/resumen-mensual"
               element={<PaginaResumenMensual />}
