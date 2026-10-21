@@ -8,6 +8,10 @@ MySQL 8.0.16+ con InnoDB y `utf8mb4`. Se verificó la entrega con MySQL 8.0.44.
 - `migrations/002_obligaciones.sql`: obligaciones y saldo pendiente.
 - `migrations/003_abonos.sql`: pagos realizados, clave idempotente y huella SHA-256
   de la solicitud.
+- `migrations/004_comprobantes.sql` y `005_comprobantes_pdf.sql`: metadatos de
+  comprobantes y soporte PDF.
+- `migrations/006_perfil_referencia.sql`: rol CONFIGURADOR, perfil progresivo,
+  bancos, servicios y auditoría. No modifica usuarios ni tablas financieras.
 - `schema_migrations`: creada por el ejecutor, registra archivo, checksum y fecha UTC.
 
 Desde `backend/`, `npm run db:migrate` aplica únicamente las migraciones pendientes.
@@ -59,5 +63,7 @@ propias filas al terminar. No borran bases ni vacían tablas. Si se interrumpe a
 una prueba pueden quedar usuarios sintéticos; una ejecución posterior no elimina datos
 ajenos para ocultar esa situación.
 
-La tabla de comprobantes corresponde a una historia posterior y no la crea esta
-migración. El diseño acordado se documenta en [docs/arquitectura.md](../docs/arquitectura.md).
+El plan, destino local autorizado, compatibilidad y decisiones de la migración 006
+se documentan en [Perfil de referencia](../docs/perfil-referencia.md). Presentar el
+destino y obtener autorización antes de migrar; la autorización de esta entrega
+se limita a `sgcp_test` en `127.0.0.1:3307`, no a desarrollo ni producción.

@@ -467,7 +467,7 @@ export function PaginaInicioSesion() {
           <div className="sapo-nota-acceso">
             <IconoUsuarios />
             <p>
-              Accede con tu cuenta de asistente o gerente.
+              Accede con tu cuenta de asistente, gerente o responsable de configuración.
             </p>
           </div>
         </div>

@@ -39,7 +39,7 @@ test('MySQL real: migraciones repetibles conservan usuarios y roles sin duplicar
   const [[despues]] = await conexiones.query('SELECT COUNT(*) AS total FROM usuarios')
   assert.equal(despues.total, antes.total)
   const [roles] = await conexiones.query('SELECT codigo FROM roles ORDER BY codigo')
-  assert.deepEqual(roles.map((fila) => fila.codigo), ['ASISTENTE', 'GERENTE'])
+  assert.deepEqual(roles.map((fila) => fila.codigo), ['ASISTENTE', 'CONFIGURADOR', 'GERENTE'])
   const [[migracion]] = await conexiones.execute('SELECT COUNT(*) AS total FROM schema_migrations WHERE name = ?', ['001_access.sql'])
   assert.equal(Number(migracion.total), 1)
 })

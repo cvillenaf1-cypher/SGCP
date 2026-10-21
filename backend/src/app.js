@@ -16,6 +16,7 @@ import { registrarObligacion } from './obligaciones/servicio.js'
 import { validarObligacion } from './obligaciones/validacion.js'
 import { listarObligaciones, obtenerObligacion } from './obligaciones/consulta.js'
 import { validarFiltroConsulta, validarIdentificadorObligacion } from './obligaciones/validacion-consulta.js'
+import { registrarRutasPerfil } from './perfil/rutas.js'
 
 export async function crearAplicacion({ pool: conexiones, config: configuracion, almacenComprobantes }) {
   const aplicacion = express()
@@ -24,7 +25,7 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion,
   const almacen = almacenComprobantes || crearAlmacenComprobantes()
   aplicacion.disable('x-powered-by')
   aplicacion.use(helmet())
-  aplicacion.use(cors({ origin: configuracion.frontendUrl, methods: ['GET', 'POST'], allowedHeaders: ['Content-Type', 'Authorization'] }))
+  aplicacion.use(cors({ origin: configuracion.frontendUrl, methods: ['GET', 'POST', 'PUT'], allowedHeaders: ['Content-Type', 'Authorization'] }))
   aplicacion.use('/api', (_solicitud, respuesta, siguiente) => { respuesta.set('Cache-Control', 'no-store'); siguiente() })
   aplicacion.use(express.json({ limit: '16kb' }))
 
@@ -102,6 +103,7 @@ export async function crearAplicacion({ pool: conexiones, config: configuracion,
   })
 
   registrarRutasComprobantes(aplicacion, conexiones, requerirSesion, almacen)
+  registrarRutasPerfil(aplicacion, conexiones, requerirSesion)
 
   // Paneles iniciales: permiten comprobar autorización real sin adelantar historias financieras.
   aplicacion.get('/api/panel/asistente', requerirSesion, autorizar(ROLES.ASISTENTE), (_solicitud, respuesta) => {

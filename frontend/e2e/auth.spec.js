@@ -5,7 +5,7 @@ async function iniciarSesion(pagina, rol) {
   const usuario = JSON.parse(process.env.SGCP_E2E_USERS).find((entrada) => entrada.role === rol)
   await pagina.goto('/#/login')
   await pagina.getByLabel('Correo electrónico').fill(usuario.email)
-  await pagina.getByLabel('Contraseña').fill(usuario.password)
+  await pagina.getByLabel('Contraseña', { exact: true }).fill(usuario.password)
   const respuesta = pagina.waitForResponse((entrada) => entrada.url().endsWith('/api/auth/login') && entrada.status() === 200)
   await pagina.getByRole('button', { name: /^Iniciar sesión/ }).click()
   const sesion = await (await respuesta).json()
@@ -37,7 +37,9 @@ test('asistente entra, no accede a gerente y logout invalida el token en MySQL',
 
 test('gerente tiene panel de lectura y autorización real frente al endpoint de asistente', async ({ page: pagina }) => {
   const sesion = await iniciarSesion(pagina, 'GERENTE')
-  await expect(pagina.getByText('Solo lectura', { exact: true })).toBeVisible()
+  await expect(pagina.getByRole('button', { name: 'Registrar pago pendiente' })).toHaveCount(0)
+  const escritura = await pagina.request.post('http://127.0.0.1:3001/api/obligaciones', { headers: { Authorization: `Bearer ${sesion.token}` }, data: {} })
+  expect(escritura.status()).toBe(403)
   await pagina.screenshot({ path: fileURLToPath(new URL('../../docs/evidence/SGCP-1-gerente.png', import.meta.url)), fullPage: true })
   const respuesta = await pagina.request.get('http://127.0.0.1:3001/api/panel/asistente', { headers: { Authorization: `Bearer ${sesion.token}` } })
   expect(respuesta.status()).toBe(403)
