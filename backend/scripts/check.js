@@ -12,4 +12,4 @@ async function comprobar(directorio) {
     }
   }
 }
-for (const directorio of ['src/', 'scripts/', 'test/']) await comprobar(new URL(`../${directorio}`, import.meta.url))
+for (const directorio of ['src/', 'scripts/', 'test/', '../shared/']) await comprobar(new URL(`../${directorio}`, import.meta.url))

@@ -6,6 +6,7 @@ import { RequerirRol } from './auth/RequireRole'
 import { PaginaInicioSesion } from './pages/LoginPage'
 import { PaginaPanel } from './pages/DashboardPage'
 import { PaginaGerente } from './gerente/PaginaGerente'
+import { ConfiguracionPerfil } from './perfil/ConfiguracionPerfil'
 import './App.css'
 
 function Aplicacion() {
@@ -13,7 +14,7 @@ function Aplicacion() {
 
   const ubicacion = useLocation()
   const esPaginaInicioSesion = ubicacion.pathname === '/login'
-  const esModuloTrabajo = Boolean(usuario) && /^\/(gerente|asistente)(\/|$)/.test(ubicacion.pathname)
+  const esModuloTrabajo = Boolean(usuario) && /^\/(gerente|asistente|configuracion)(\/|$)/.test(ubicacion.pathname)
 
   const [cerrando, establecerCerrando] = useState(false)
   const [error, establecerError] = useState('')
@@ -61,9 +62,7 @@ function Aplicacion() {
                 <strong>{usuario.name}</strong>
 
                 <span className="role-label">
-                  {usuario.role === 'ASISTENTE'
-                    ? 'Asistente'
-                    : 'Gerente'}
+                  {{ ASISTENTE: 'Asistente', GERENTE: 'Gerente', CONFIGURADOR: 'Responsable de configuración' }[usuario.role]}
                 </span>
               </div>
 
@@ -126,6 +125,10 @@ function Aplicacion() {
               element={<PaginaGerente />}
             />
 
+          </Route>
+
+          <Route element={<RequerirRol role="CONFIGURADOR" />}>
+            <Route path="/configuracion/perfil" element={<ConfiguracionPerfil alBloquear={establecerOperacionBloqueada} />} />
           </Route>
 
           {/* Página no encontrada */}

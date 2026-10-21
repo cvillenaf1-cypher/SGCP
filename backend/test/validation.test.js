@@ -13,11 +13,12 @@ test('login: campos vacíos, tipos incorrectos, correo inválido y rol inyectado
   assert.deepEqual(valido.fields, {})
 })
 
-test('alta local: exige contraseña larga y uno de los dos roles', () => {
+test('alta local: exige contraseña larga y un rol explícito, incluido CONFIGURADOR', () => {
   const entrada = { name: 'Prueba', email: 'prueba@example.test', password: randomBytes(24).toString('hex'), role: 'ASISTENTE' }
   assert.doesNotThrow(() => validarNuevoUsuario(entrada))
+  assert.doesNotThrow(() => validarNuevoUsuario({ ...entrada, role: 'CONFIGURADOR' }))
   assert.throws(() => validarNuevoUsuario({ ...entrada, password: 'corta' }), /12 y 128/)
-  assert.throws(() => validarNuevoUsuario({ ...entrada, role: 'ADMIN' }), /ASISTENTE o GERENTE/)
+  assert.throws(() => validarNuevoUsuario({ ...entrada, role: 'ADMIN' }), /ASISTENTE, GERENTE o CONFIGURADOR/)
   assert.throws(() => validarNuevoUsuario({ ...entrada, name: ' ' }), /nombre/)
 })
 

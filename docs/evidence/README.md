@@ -10,3 +10,13 @@ Muestran usuarios sintéticos de prueba, sin correos, contraseñas ni tokens vis
 Las pruebas E2E usan MySQL real, credenciales aleatorias por ejecución y eliminan
 únicamente sus propios usuarios/sesiones al finalizar. Los reportes temporales,
 las trazas y los archivos locales no se versionan.
+
+## Perfil de referencia
+
+`npm run test:e2e -- e2e/perfil-referencia.spec.js` genera capturas del módulo con
+API y MySQL locales reales, usando exclusivamente datos sintéticos:
+
+- `perfil-referencia-vacio.png`: perfil y titular todavía sin configurar.
+- `perfil-referencia-escritorio.png`: titular parcial, dos referencias BCP y dos
+  suministros a nombre de un tercero relacionado.
+- `perfil-referencia-movil.png`: el mismo perfil en 390 px, sin desbordamiento horizontal.

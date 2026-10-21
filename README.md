@@ -123,6 +123,17 @@ Los archivos `.env`, `.env.test` y `.local/` se excluyen de Git; solo las planti
 No colocar contraseñas en variables `VITE_*`: Vite las incorpora al JavaScript público.
 Reinicia los servicios después de modificar variables; para producción, recompila el frontend.
 
+## Perfil de referencia progresivo
+
+El responsable con rol **CONFIGURADOR** accede a `/#/configuracion/perfil` para
+guardar progresivamente titular, bancos y servicios. No se asigna ese rol a ningún
+usuario existente ni se modifican permisos financieros. El perfil puede estar vacío.
+
+Consulta [docs/perfil-referencia.md](docs/perfil-referencia.md) para el plan de la
+migración 006, autorización local, permisos, endpoints, pruebas y capturas.
+El contrato compartido está en `shared/`; conservar esa carpeta junto al backend
+y frontend. Antes de migrar cualquier base, verificar el destino y obtener autorización.
+
 ## Comprobaciones
 
 Con el backend iniciado, en PowerShell:

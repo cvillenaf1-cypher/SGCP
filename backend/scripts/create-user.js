@@ -14,7 +14,7 @@ try {
   consola = createInterface({ input: process.stdin, output: salida, terminal: true })
   const nombre = await consola.question('Nombre: ')
   const correo = await consola.question('Correo: ')
-  const rol = (await consola.question('Rol (ASISTENTE o GERENTE): ')).trim().toUpperCase()
+  const rol = (await consola.question('Rol (ASISTENTE, GERENTE o CONFIGURADOR): ')).trim().toUpperCase()
   process.stdout.write('Contraseña (12–128 caracteres, entrada oculta): ')
   oculto = true
   const contrasena = await consola.question('')

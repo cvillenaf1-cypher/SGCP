@@ -1,4 +1,4 @@
-export const ROLES = Object.freeze({ ASISTENTE: 'ASISTENTE', GERENTE: 'GERENTE' })
+export const ROLES = Object.freeze({ ASISTENTE: 'ASISTENTE', GERENTE: 'GERENTE', CONFIGURADOR: 'CONFIGURADOR' })
 
 export function normalizarCorreo(valor) {
   return typeof valor === 'string' ? valor.trim().toLowerCase() : ''
@@ -25,5 +25,5 @@ export function validarNuevoUsuario({ name: nombre, email: correo, password: con
   if (typeof nombre !== 'string' || !nombre.trim() || nombre.trim().length > 100) throw new Error('El nombre debe tener entre 1 y 100 caracteres.')
   if (!esCorreoValido(normalizarCorreo(correo))) throw new Error('El correo no es válido.')
   if (typeof contrasena !== 'string' || contrasena.length < 12 || contrasena.length > 128 || !contrasena.trim()) throw new Error('La contraseña debe tener entre 12 y 128 caracteres.')
-  if (!Object.values(ROLES).includes(rol)) throw new Error('El rol debe ser ASISTENTE o GERENTE.')
+  if (!Object.values(ROLES).includes(rol)) throw new Error('El rol debe ser ASISTENTE, GERENTE o CONFIGURADOR.')
 }

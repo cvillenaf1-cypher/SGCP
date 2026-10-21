@@ -1,0 +1,27 @@
+.perfil-pagina { max-width: 1100px; margin: 0 auto; }
+.perfil-antetitulo { color: #008b61; font-size: 0.78rem; letter-spacing: 0.12em; font-weight: 800; }
+.perfil-navegacion, .perfil-acciones { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.perfil-navegacion a { padding: 10px 16px; border: 1px solid #ced9e8; border-radius: 10px; background: white; }
+.perfil-seccion { margin-top: 24px; scroll-margin-top: 24px; }
+.perfil-seccion h3, .perfil-lista h4 { margin: 0; }
+.perfil-pagina button { background: #00845d; min-height: 44px; }
+.perfil-pagina button:hover:not(:disabled) { background: #006a4b; }
+.perfil-pagina .perfil-secundario { background: #e7f1f0; color: #124d40; border: 1px solid #bed5d0; }
+.perfil-pagina .perfil-secundario:hover:not(:disabled) { background: #d1e6e1; }
+.perfil-vacio { padding: 16px 24px; border: 1px dashed #a9b8cd; border-radius: 16px; margin-top: 20px; }
+.perfil-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.perfil-formulario { margin-top: 20px; padding-top: 8px; border-top: 1px solid #dce5ef; }
+.perfil-formulario select { width: 100%; padding: 12px; border: 1px solid #8b9cb2; border-radius: 8px; color: #1d2b40; background: white; font: inherit; }
+.perfil-formulario select:focus-visible { outline: 3px solid #b1c7ef; outline-offset: 1px; }
+.perfil-formulario select[aria-invalid='true'] { border-color: #a32323; }
+.perfil-datos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.perfil-datos dt { color: #526176; font-size: 0.8rem; }
+.perfil-datos dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+.perfil-lista { list-style: none; padding: 0; }
+.perfil-lista > li { padding: 20px; border: 1px solid #dce5ef; background: #f9fbfd; border-radius: 12px; margin: 16px 0; }
+.perfil-lista .perfil-acciones { margin-bottom: 0; }
+@media (max-width: 640px) {
+  .perfil-campos, .perfil-datos { grid-template-columns: 1fr; }
+  .perfil-seccion { padding: 20px; }
+  .perfil-navegacion a { flex: 1 1 auto; text-align: center; }
+}

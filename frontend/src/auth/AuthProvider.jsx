@@ -13,7 +13,7 @@ export function ProveedorAutenticacion({ children: contenido }) {
 
   const iniciarSesion = useCallback(async (correo, contrasena) => {
     const sesion = await solicitarApi('/api/auth/login', { method: 'POST', body: { email: correo, password: contrasena } })
-    if (!sesion.token || !['ASISTENTE', 'GERENTE'].includes(sesion.user?.role) || !(Date.parse(sesion.expiresAt) > Date.now())) {
+    if (!sesion.token || !['ASISTENTE', 'GERENTE', 'CONFIGURADOR'].includes(sesion.user?.role) || !(Date.parse(sesion.expiresAt) > Date.now())) {
       throw new Error('No se pudo validar la sesión del servidor.')
     }
     establecerEstado({ sesion, aviso: '' })
